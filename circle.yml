@@ -12,6 +12,8 @@ dependencies:
     - if [ ! -f ~/images/docker.rpxc.tar ]; then wget http://public.thisissoon.com.s3.amazonaws.com/docker.rpxc.tar -O ~/images/docker.rpxc.tar; fi
   cache_directories:
     - "~/images/"
+  override:
+    - exit 0
   post:
     - docker images
     - docker load < ~/images/docker.rpxc.tar
