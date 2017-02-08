@@ -19,7 +19,7 @@ dependencies:
 
 test:
   override:
-    exit 0
+    - exit 0
 
 deployment:
   master:
