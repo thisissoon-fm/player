@@ -20,3 +20,9 @@ dependencies:
 test:
   override:
     exit 0
+
+deployment:
+  master:
+    branch: master
+    commands:
+      - docker run --rm -v `pwd`/sfm/player:/go/src/player registry.soon.build/sfm/player:rpxc
