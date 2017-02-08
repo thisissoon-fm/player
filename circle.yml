@@ -8,8 +8,8 @@ machine:
 
 dependencies:
   pre:
-    - mkdir ~/images
-    - wget http://public.thisissoon.com.s3.amazonaws.com/docker.rpxc.tar -O ~/images/docker.rpxc.tar
+    - if [ ! -d ~/images ]; then mkdir ~/images; fi
+    - if [ ! -f ~/images/docker.rpxc.tar ]; wget http://public.thisissoon.com.s3.amazonaws.com/docker.rpxc.tar -O ~/images/docker.rpxc.tar; fi
   cache_directories:
     - "~/images/"
   post:
