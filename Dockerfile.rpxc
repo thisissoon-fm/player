@@ -1,0 +1,35 @@
+FROM sdthirlwall/raspberry-pi-cross-compiler
+
+# Install Golang 1.7
+RUN /bin/sh -c '\
+        echo "deb http://ftp.debian.org/debian jessie-backports main" \
+            >> /etc/apt/sources.list \
+        && apt-get update \
+        && apt-get -t jessie-backports install golang -y'
+
+# Install libpulse-dev into the raspbian vm
+RUN install-raspbian --update libpulse-dev
+
+# ENVs
+ENV CC=arm-linux-gnueabihf-gcc \
+    PKG_CONFIG_PATH=$SYSROOT/usr/lib/$HOST/pkgconfig \
+    OS="linux" \
+    ARCH="arm7" \
+    GOOS="linux" \
+    GOARCH="arm" \
+    GOPATH=/go \
+    CGO_ENABLED=1 \
+    CGO_CFLAGS="--sysroot=$SYSROOT" \
+    CGO_LDFLAGS="--sysroot=$SYSROOT"
+
+# Volume
+VOLUME ["/go/src/player"]
+
+# Work Dir
+WORKDIR "/go/src/player"
+
+# Enttrypint
+ENTRYPOINT ["make"]
+
+# Command
+CMD ["build"]

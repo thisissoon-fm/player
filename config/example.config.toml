@@ -1,0 +1,8 @@
+#
+# Example SOON_ FM Player Configuration
+# All values are the default.
+#
+
+[googlemusic]
+username = "" # Google Music Username, e.g: foo@bar.com
+password = "" # Google Music Password, e.g: 1234
