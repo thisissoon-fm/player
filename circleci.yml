@@ -14,3 +14,4 @@ dependencies:
     - "~/images/"
   post:
     - docker load < ~/images/docker.rpxc.tar
+    - docker images
