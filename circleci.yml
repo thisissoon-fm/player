@@ -1,0 +1,16 @@
+#
+# CircleCI Configuration
+#
+
+machine:
+  services:
+    - docker
+
+dependencies:
+  override:
+    - mkdir ~/images
+    - wget http://public.thisissoon.com.s3.amazonaws.com/docker.rpxc.tar -O ~/images
+  cache_directories:
+    - "~/images/"
+  post:
+    - docker load < ~/images/docker.rpxc.tar
