@@ -9,7 +9,7 @@ machine:
 dependencies:
   override:
     - mkdir ~/images
-    - wget http://public.thisissoon.com.s3.amazonaws.com/docker.rpxc.tar -O ~/images
+    - wget http://public.thisissoon.com.s3.amazonaws.com/docker.rpxc.tar -O ~/images/docker.rpxc.tar
   cache_directories:
     - "~/images/"
   post:
