@@ -11,7 +11,8 @@ CGO_LDFLAGS ?= ""
 GOOS 		?=
 GOARCH 		?=
 GOARM 		?=
-GOOUT  		?= "./sfmplayer.$(OS)-$(ARCH)"
+GOOUTDIR 	?= .
+GOOUT  		?= "$(GOOUTDIR)/sfmplayer.$(OS)-$(ARCH)"
 
 .PHONY: build
 
