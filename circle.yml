@@ -25,4 +25,4 @@ deployment:
   master:
     branch: master
     commands:
-      - docker run --rm -v `pwd`/sfm/player:/go/src/player registry.soon.build/sfm/player:rpxc
+      - docker run --rm -v `pwd`/player:/go/src/player registry.soon.build/sfm/player:rpxc
