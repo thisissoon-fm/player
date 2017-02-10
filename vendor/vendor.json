@@ -159,6 +159,12 @@
 			"revisionTime": "2017-01-16T02:49:11Z"
 		},
 		{
+			"checksumSHA1": "K/kb5Ys6th1BVXpgSIvHgvRSlvM=",
+			"path": "github.com/rs/xid",
+			"revision": "e39c3571542a72a9d44559fc96e2a80ed896682b",
+			"revisionTime": "2017-01-08T06:32:47Z"
+		},
+		{
 			"checksumSHA1": "zmC8/3V4ls53DJlNTKDZwPSC/dA=",
 			"path": "github.com/satori/go.uuid",
 			"revision": "b061729afc07e77a8aa4fad0a2fd840958f1942a",
