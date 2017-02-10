@@ -4,6 +4,7 @@ package googlemusic
 
 import (
 	"io"
+	"player/buffer"
 
 	"github.com/krak3n/gmusic"
 )
@@ -49,7 +50,10 @@ func (p *Player) Stream(track string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return rsp.Body, err
+	// Createa http stream buffer
+	buff := buffer.HTTPBuffer(rsp)
+	go buff.Buffer() // Start buffering
+	return buff, nil
 }
 
 // Constructs a new Player
