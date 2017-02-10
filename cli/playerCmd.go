@@ -5,8 +5,8 @@ import (
 
 	"player/config"
 	"player/player"
-	"player/player/googlemusic"
-	"player/player/soundcloud"
+	"player/services/googlemusic"
+	"player/services/soundcloud"
 
 	"github.com/spf13/cobra"
 )
@@ -37,7 +37,7 @@ var playerCmd = &cobra.Command{
 			return
 		}
 		defer player.Close()
-		err = player.Play(gm.Name(), "Tb56fzzbswo6iqf34dghtaywjni")
+		err = player.Play(gm.Name(), "Tzmsu5o2rdjuvjk7zxgoqcyqx7m")
 		if err != nil {
 			fmt.Println(err)
 			return

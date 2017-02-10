@@ -1,7 +1,6 @@
 package player
 
 import (
-	"bufio"
 	"errors"
 	"io"
 
@@ -63,24 +62,26 @@ func (p *Player) Play(s string, t string) error {
 	if err != nil {
 		return err
 	}
-	defer stream.Close() // When we done, close the track stream
-	// Read buffer
-	buffer := bufio.NewReader(stream)
-	// Data buffer
-	data := make([]byte, 1024*8)
+	defer stream.Close()
 	// MPEG Decoder
-	decoder := &mpa.Reader{Decoder: &mpa.Decoder{Input: buffer}}
-	// Steam track to audio stream
+	decoder := &mpa.Reader{Decoder: &mpa.Decoder{Input: stream}}
 	for {
-		i, err := decoder.Read(data)
-		if err == io.EOF || i == 0 {
-			return nil
+		data := make([]byte, 1024*8)
+		rn, err := decoder.Read(data)
+		if err != nil || rn == 0 {
+			if err == io.ErrShortBuffer { // Wait for buffer
+				continue
+			}
+			if err == io.EOF { // Done reading
+				return nil
+			}
 		}
-		i, err = p.stream.Write(data)
+		_, err = p.stream.Write(data)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
+	return nil
 }
 
 // Consturcts a new Player with the given steamers
