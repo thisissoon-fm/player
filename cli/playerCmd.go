@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"player/config"
+	"player/logger"
 	"player/player"
 	"player/services/googlemusic"
 	"player/services/soundcloud"
@@ -22,6 +23,7 @@ var playerCmd = &cobra.Command{
 		if err := config.Read(configPath); err != nil {
 			fmt.Println(err) // TODO: Warning Log
 		}
+		logger.SetGlobalLogger(logger.New(logger.NewConfig()))
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
@@ -37,12 +39,7 @@ var playerCmd = &cobra.Command{
 			return
 		}
 		defer player.Close()
-		err = player.Play(gm.Name(), "Tzmsu5o2rdjuvjk7zxgoqcyqx7m")
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		err = player.Play(sc.Name(), "295322075")
+		err = player.Play(gm.Name(), "Tjqq2dasnnsnjwxjvu7s2hqdkpq")
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -57,6 +54,7 @@ func init() {
 		"c",
 		"",
 		"Optional absolute path to toml config file")
+	playerCmd.AddCommand(buildCmd)
 }
 
 func Run() error {
