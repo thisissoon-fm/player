@@ -4,11 +4,12 @@ package buffer
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	"player/logger"
 
 	"github.com/djherbis/buffer"
 )
@@ -45,19 +46,23 @@ func (h *HTTP) Read(b []byte) (int, error) {
 // Closes and removes the temporary buffer file
 func (h *HTTP) Close() error {
 	if h.file != nil {
-		h.file.Close()
-		// TODO Error Check
-		os.Remove(h.file.Name())
-		// TODO: Error Check
+		if err := h.file.Close(); err != nil {
+			logger.WithError(err).Error("error closing buffer file")
+			return err
+		}
+		if err := os.Remove(h.file.Name()); err != nil {
+			logger.WithError(err).Error("error removing buffer file")
+			return err
+		}
 	}
-	// TODO: Surface close errors
 	return nil
 }
 
 // Buffer the http Response into a temporary file for reading
 func (h *HTTP) Buffer() error {
-	fmt.Println("start buffering")
-	defer fmt.Println("finished buffering")
+	f := logger.F{"size": h.Response.ContentLength}
+	logger.WithFields(f).Debug("start http buffer")
+	defer logger.WithFields(f).Debug("finished buffering")
 	defer h.Response.Body.Close() // Close the HTTP Response body once we are done
 	// Make the buffer
 	if err := h.mkBuffer(); err != nil {
@@ -74,14 +79,14 @@ func (h *HTTP) Buffer() error {
 			case io.EOF:
 				eof = true
 			default:
-				fmt.Println("response read error:", rn, err)
+				logger.WithError(err).Error("http response body read error")
 				return err
 			}
 		}
 		// Write body data to buffer
 		wn, err := writer.Write(data[:rn])
 		if err != nil {
-			fmt.Println("buffer write error", wn, err)
+			logger.WithError(err).Error("buffer write error")
 			return err
 		}
 		h.buffered += wn
@@ -93,12 +98,12 @@ func (h *HTTP) Buffer() error {
 
 // Makes a buffer to store the HTTP stream to a temporary file
 func (h *HTTP) mkBuffer() error {
-	fmt.Println("make buffer")
+	logger.Debug("make buffer")
 	f, err := ioutil.TempFile(os.TempDir(), "sfmplayer.buffer")
 	if err != nil {
 		return err
 	}
-	fmt.Println("buffer @", f.Name())
+	logger.WithField("path", f.Name()).Debug("tmp file created")
 	b := buffer.NewFile(h.Response.ContentLength, f)
 	h.buffer = b
 	h.file = f

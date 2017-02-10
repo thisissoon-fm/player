@@ -4,9 +4,13 @@ import (
 	"errors"
 	"io"
 
+	"player/logger"
+
 	"github.com/korandiz/mpa"
 	pulse "github.com/mesilliac/pulse-simple"
 )
+
+var ErrUnknownStreamer = errors.New("unknown streamer")
 
 // All streamers must implement this interface
 type Streamer interface {
@@ -43,7 +47,10 @@ type Player struct {
 	stream *pulse.Stream
 }
 
+// Close the pulse audio stream
 func (p *Player) Close() error {
+	logger.Debug("close player")
+	defer logger.Info("closed player")
 	if p.stream != nil {
 		p.stream.Drain()
 		p.stream.Free()
@@ -51,11 +58,15 @@ func (p *Player) Close() error {
 	return nil
 }
 
+// Play a track from a service
 func (p *Player) Play(s string, t string) error {
+	f := logger.F{"service": s, "track": t}
+	logger.WithFields(f).Info("play track")
+	defer logger.WithFields(f).Info("finished track")
 	// Get the streamer
 	streamer := p.streamers.Get(s)
 	if streamer == nil {
-		return errors.New("unknown streamer")
+		return ErrUnknownStreamer
 	}
 	// Get track stream
 	stream, err := streamer.Stream(t)
@@ -67,8 +78,7 @@ func (p *Player) Play(s string, t string) error {
 	decoder := &mpa.Reader{Decoder: &mpa.Decoder{Input: stream}}
 	for {
 		data := make([]byte, 1024*8)
-		rn, err := decoder.Read(data)
-		if err != nil || rn == 0 {
+		if _, err := decoder.Read(data); err != nil {
 			if err == io.ErrShortBuffer { // Wait for buffer
 				continue
 			}
@@ -76,8 +86,7 @@ func (p *Player) Play(s string, t string) error {
 				return nil
 			}
 		}
-		_, err = p.stream.Write(data)
-		if err != nil {
+		if _, err = p.stream.Write(data); err != nil {
 			return err
 		}
 	}
