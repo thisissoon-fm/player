@@ -15,6 +15,24 @@
 			"revisionTime": "2017-01-29T16:40:27Z"
 		},
 		{
+			"checksumSHA1": "dQ7OGKAsVAeOZyfHg4ug5MGB6O0=",
+			"path": "github.com/djherbis/buffer",
+			"revision": "20781a7a890a71d6061b5b45b6bcf5311bbd9118",
+			"revisionTime": "2016-02-11T03:08:10Z"
+		},
+		{
+			"checksumSHA1": "IBbdYHB32oPftUQwQCypCFzWbG4=",
+			"path": "github.com/djherbis/buffer/limio",
+			"revision": "20781a7a890a71d6061b5b45b6bcf5311bbd9118",
+			"revisionTime": "2016-02-11T03:08:10Z"
+		},
+		{
+			"checksumSHA1": "AB9CaOyWTRWtTsFy/BefZtFIzQI=",
+			"path": "github.com/djherbis/buffer/wrapio",
+			"revision": "20781a7a890a71d6061b5b45b6bcf5311bbd9118",
+			"revisionTime": "2016-02-11T03:08:10Z"
+		},
+		{
 			"checksumSHA1": "JhI3dzfib2NMGL11NiUswioZP8U=",
 			"path": "github.com/fsnotify/fsnotify",
 			"revision": "a904159b9206978bb6d53fcc7a769e5cd726c737",
