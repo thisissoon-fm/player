@@ -29,6 +29,7 @@ type Client struct {
 	id     string
 	conn   net.Conn
 	wg     *sync.WaitGroup
+	readC  chan []byte
 	closed bool
 	closeC chan bool
 }
@@ -48,10 +49,31 @@ func (c *Client) Connect(address string) error {
 	return nil
 }
 
-// Read data from the socket
-func (c *Client) Read() ([]byte, error) {
+// Goroutine for reading messages from the socket connection
+// and placing them onto a read channel
+func (c *Client) read() {
+	logger.Debug("start unix socket client read loop")
+	defer logger.Debug("exit unix socket client read loop")
+	c.wg.Add(1)
+	defer c.wg.Done()
 	buf := bufio.NewReader(c.conn)
-	return buf.ReadBytes('\n') // EOF on connction close
+	for {
+		b, err := buf.ReadBytes('\n') // EOF on connction close
+		if err != nil {
+			logger.WithError(err).Warn("socket client read error")
+			return
+		}
+		c.readC <- b
+	}
+}
+
+// Read data from the socket
+func (c *Client) Read() <-chan []byte {
+	if c.readC == nil {
+		c.readC = make(chan []byte)
+		go c.read()
+	}
+	return (<-chan []byte)(c.readC)
 }
 
 // Writes data to the client unix socket connection

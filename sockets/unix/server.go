@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 
+	"player/event"
 	"player/logger"
 )
 
@@ -49,6 +50,7 @@ func (s *Server) Listen() error {
 		}
 		client := NewClientWithConn(conn)
 		s.clients.Add(client)
+		event.AddClient(client)
 		logger.Debug("unix socket client connected")
 	}
 	return nil
