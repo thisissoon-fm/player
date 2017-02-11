@@ -10,7 +10,18 @@ import (
 	pulse "github.com/mesilliac/pulse-simple"
 )
 
+var player *Player // Global Player
+
 var ErrUnknownStreamer = errors.New("unknown streamer")
+
+// Package initalisation
+func init() {
+	var err error
+	player, err = New()
+	if err != nil {
+		logger.WithError(err).Fatal("failed to initialise player")
+	}
+}
 
 // All streamers must implement this interface
 type Streamer interface {
@@ -40,14 +51,27 @@ func (m Streamers) Del(name string) {
 	delete(m, name)
 }
 
+// Adds a streamer to the global player streamers
+func AddStreamer(s Streamer) {
+	player.Streamers.Add(s)
+}
+
+// Remove a streamer from the global player steamer
+func DelStreamer(s string) {
+	player.Streamers.Del(s)
+}
+
+// Audio Player
 type Player struct {
-	// Streamers
-	streamers Streamers
-	// Audio Stream
-	stream *pulse.Stream
+	// Exported Fields
+	Streamers Streamers // Service Streamers (google etc)
+	// Unexported Fields
+	stream *pulse.Stream // Audio Stream
+	paused bool          // Paused State
 }
 
 // Close the pulse audio stream
+func Close() error { return player.Close() }
 func (p *Player) Close() error {
 	logger.Debug("close player")
 	defer logger.Info("closed player")
@@ -58,13 +82,28 @@ func (p *Player) Close() error {
 	return nil
 }
 
+// Set the pause state of the player
+func Pause(b bool) { player.Pause(b) }
+func (p *Player) Pause(b bool) {
+	p.paused = b
+}
+
+// Returns the player paused state
+func Paused() { player.Paused() }
+func (p *Player) Paused() bool {
+	return p.paused
+}
+
 // Play a track from a service
-func (p *Player) Play(s string, t string) error {
+func Play(s, t string) error { return player.Play(s, t) }
+func (p *Player) Play(s, t string) error {
 	f := logger.F{"service": s, "track": t}
 	logger.WithFields(f).Info("play track")
 	defer logger.WithFields(f).Info("finished track")
+	// Reset Pause State
+	p.paused = false
 	// Get the streamer
-	streamer := p.streamers.Get(s)
+	streamer := p.Streamers.Get(s)
 	if streamer == nil {
 		return ErrUnknownStreamer
 	}
@@ -77,6 +116,9 @@ func (p *Player) Play(s string, t string) error {
 	// MPEG Decoder
 	decoder := &mpa.Reader{Decoder: &mpa.Decoder{Input: stream}}
 	for {
+		if p.paused { // If paused, don't read the buffer
+			continue
+		}
 		data := make([]byte, 1024*8)
 		if _, err := decoder.Read(data); err != nil {
 			if err == io.ErrShortBuffer { // Wait for buffer
@@ -105,7 +147,7 @@ func New(s ...Streamer) (*Player, error) {
 		streamers.Add(streamer)
 	}
 	p := &Player{
-		streamers: streamers,
+		Streamers: streamers,
 		stream:    stream,
 	}
 	return p, nil
