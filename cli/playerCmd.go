@@ -6,8 +6,8 @@ import (
 	"player/config"
 	"player/logger"
 	"player/player"
-	"player/services/googlemusic"
-	"player/services/soundcloud"
+	"player/providers/googlemusic"
+	"player/providers/soundcloud"
 
 	"github.com/spf13/cobra"
 )
@@ -21,7 +21,7 @@ var playerCmd = &cobra.Command{
 	Short: "SOON_ FM Music Player",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if err := config.Read(configPath); err != nil {
-			fmt.Println(err) // TODO: Warning Log
+			logger.WithError(err).Warn("unable to read config")
 		}
 		logger.SetGlobalLogger(logger.New(logger.NewConfig()))
 	},
@@ -32,17 +32,21 @@ var playerCmd = &cobra.Command{
 			fmt.Println(err)
 			return
 		}
+		player.AddStreamer(gm)
 		sc := soundcloud.New(soundcloud.NewConfig())
-		player, err := player.New(gm, sc)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+		player.AddStreamer(sc)
 		defer player.Close()
-		err = player.Play(gm.Name(), "Tjqq2dasnnsnjwxjvu7s2hqdkpq")
-		if err != nil {
-			fmt.Println(err)
-			return
+		tracks := []string{
+			"T2bzzzgnjq3asx433qed2ip77iu",
+			"Toxylvghchv3irywxuchgb2yrhe",
+			"T7bqkzir7gjkazqcpyfgb2ifjua",
+		}
+		for _, t := range tracks {
+			err = player.Play(gm.Name(), t)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 		}
 	},
 }
