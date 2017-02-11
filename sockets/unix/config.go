@@ -1,14 +1,14 @@
-package socket
+package unix
 
 import "github.com/spf13/viper"
 
 const (
-	vAddress = "socket.address"
+	vAddress = "unixsocket.address"
 )
 
 func init() {
 	viper.BindEnv(vAddress)
-	viper.SetDefault(vAddress, "/tmp/sfm.player.sock")
+	viper.SetDefault(vAddress, "/tmp/sfmplayer.sock")
 }
 
 type Configurer interface {

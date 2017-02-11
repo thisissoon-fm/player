@@ -1,4 +1,4 @@
-package socket
+package unix
 
 import (
 	"bufio"
@@ -25,8 +25,6 @@ func (c Clients) Del(id string) {
 
 // A unix socket client
 type Client struct {
-	// Exported Fields
-	Config Configurer
 	// Unexported Fields
 	id     string
 	conn   net.Conn
@@ -41,8 +39,8 @@ func (c *Client) ID() string {
 }
 
 // Connect to a Unix socket
-func (c *Client) Connect() error {
-	conn, err := net.Dial("unix", c.Config.Address())
+func (c *Client) Connect(address string) error {
+	conn, err := net.Dial("unix", address)
 	if err != nil {
 		return err
 	}
@@ -50,28 +48,10 @@ func (c *Client) Connect() error {
 	return nil
 }
 
-// Reads data from the socket connection
-func (c *Client) read(ch chan []byte) {
-	logger.Debug("start socket client read loop")
-	defer logger.Debug("exit socket client read loop")
-	c.wg.Add(1)
-	defer c.wg.Done()
-	defer close(ch)
-	buf := bufio.NewReader(c.conn)
-	for {
-		b, err := buf.ReadBytes('\n') // EOF on connction close
-		if err != nil {
-			return
-		}
-		ch <- b
-	}
-}
-
 // Read data from the socket
-func (c *Client) Read() <-chan []byte {
-	ch := make(chan []byte)
-	go c.read(ch) // Start the read loop
-	return (<-chan []byte)(ch)
+func (c *Client) Read() ([]byte, error) {
+	buf := bufio.NewReader(c.conn)
+	return buf.ReadBytes('\n') // EOF on connction close
 }
 
 // Writes data to the client unix socket connection
@@ -101,9 +81,8 @@ func (c *Client) Close() error {
 }
 
 // Constructs a new Client
-func NewClient(c Configurer) *Client {
+func NewClient() *Client {
 	return &Client{
-		Config: c,
 		id:     xid.New().String(),
 		wg:     &sync.WaitGroup{},
 		closeC: make(chan bool),
@@ -111,8 +90,8 @@ func NewClient(c Configurer) *Client {
 }
 
 // Constructs a new client with an already open connection
-func NewClientWithConn(c Configurer, conn net.Conn) *Client {
-	client := NewClient(c)
+func NewClientWithConn(conn net.Conn) *Client {
+	client := NewClient()
 	client.conn = conn
 	return client
 }
