@@ -15,6 +15,12 @@
 			"revisionTime": "2017-01-29T16:40:27Z"
 		},
 		{
+			"checksumSHA1": "dvabztWVQX8f6oMLRyv4dLH+TGY=",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "346938d642f2ec3594ed81d874461961cd0faa76",
+			"revisionTime": "2016-10-29T20:57:26Z"
+		},
+		{
 			"checksumSHA1": "dQ7OGKAsVAeOZyfHg4ug5MGB6O0=",
 			"path": "github.com/djherbis/buffer",
 			"revision": "20781a7a890a71d6061b5b45b6bcf5311bbd9118",
@@ -159,6 +165,12 @@
 			"revisionTime": "2017-01-16T02:49:11Z"
 		},
 		{
+			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
+			"revisionTime": "2016-01-10T10:55:54Z"
+		},
+		{
 			"checksumSHA1": "K/kb5Ys6th1BVXpgSIvHgvRSlvM=",
 			"path": "github.com/rs/xid",
 			"revision": "e39c3571542a72a9d44559fc96e2a80ed896682b",
@@ -223,6 +235,12 @@
 			"path": "github.com/spf13/viper",
 			"revision": "5ed0fc31f7f453625df314d8e66b9791e8d13003",
 			"revisionTime": "2016-12-13T09:38:49Z"
+		},
+		{
+			"checksumSHA1": "JXUVA1jky8ZX8w09p2t5KLs97Nc=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "4d4bfba8f1d1027c4fdbe371823030df51419987",
+			"revisionTime": "2017-01-30T11:31:45Z"
 		},
 		{
 			"checksumSHA1": "uTQtOqR0ePMMcvuvAIksiIZxhqU=",
