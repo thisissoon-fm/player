@@ -77,6 +77,7 @@ func (h *HTTP) Buffer() error {
 		if err != nil {
 			switch err {
 			case io.EOF:
+				logger.WithError(err).Error("http response EOF")
 				eof = true
 			default:
 				logger.WithError(err).Error("http response body read error")
@@ -87,7 +88,6 @@ func (h *HTTP) Buffer() error {
 		wn, err := writer.Write(data[:rn])
 		if err != nil {
 			logger.WithError(err).Error("buffer write error")
-			return err
 		}
 		h.buffered += wn
 		if eof {
