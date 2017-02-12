@@ -3,6 +3,7 @@ package player
 import (
 	"errors"
 	"io"
+	"sync"
 
 	"player/logger"
 
@@ -70,11 +71,12 @@ type Player struct {
 	// Exported Fields
 	Streamers Streamers // Service Streamers (google etc)
 	// Unexported Fields
-	audio   *pulse.Stream // Audio Stream
-	paused  bool          // Paused State
-	pauseC  chan bool
-	resumeC chan bool
-	closeC  chan bool
+	audio     *pulse.Stream // Audio Stream
+	pauseLock *sync.Mutex
+	paused    bool
+	pauseC    chan bool
+	resumeC   chan bool
+	closeC    chan bool
 }
 
 // Close the pulse audio stream
@@ -93,20 +95,28 @@ func (p *Player) Close() error {
 // Pause the player
 func Pause() { player.Pause() }
 func (p *Player) Pause() {
-	p.paused = true
-	p.pauseC <- true
+	p.pauseLock.Lock()
+	if !p.IsPaused() {
+		p.paused = true
+		p.pauseC <- true
+	}
+	p.pauseLock.Unlock()
 }
 
 // Resume the player
 func Resume() { player.Resume() }
 func (p *Player) Resume() {
-	p.paused = false
-	p.resumeC <- true
+	p.pauseLock.Lock()
+	if p.IsPaused() {
+		p.paused = false
+		p.resumeC <- true
+	}
+	p.pauseLock.Unlock()
 }
 
 // Returns the player paused state
-func Paused() { player.Paused() }
-func (p *Player) Paused() bool {
+func IsPaused() { player.IsPaused() }
+func (p *Player) IsPaused() bool {
 	return p.paused
 }
 
@@ -153,6 +163,7 @@ func (p *Player) Play(s, t string) error {
 
 // Stream routine, takes a reader
 func (p *Player) stream(r io.Reader) error {
+	data := make([]byte, 1024*8)
 	for {
 		select {
 		case <-p.pauseC:
@@ -160,7 +171,6 @@ func (p *Player) stream(r io.Reader) error {
 		case <-p.closeC:
 			return ErrClose
 		default:
-			data := make([]byte, 1024*8)
 			if _, err := r.Read(data); err != nil {
 				return err
 			}
@@ -185,6 +195,7 @@ func New(s ...Streamer) (*Player, error) {
 	p := &Player{
 		Streamers: streamers,
 		audio:     audio,
+		pauseLock: &sync.Mutex{},
 		pauseC:    make(chan bool),
 		resumeC:   make(chan bool),
 		closeC:    make(chan bool),
