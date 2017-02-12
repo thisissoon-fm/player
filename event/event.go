@@ -1,5 +1,15 @@
 package event
 
+import (
+	"encoding/json"
+	"time"
+)
+
+const (
+	PauseEvent  string = "pause"
+	ResumeEvent string = "resume"
+)
+
 type Reader interface {
 	Read() <-chan []byte
 }
@@ -16,4 +26,10 @@ type ReadWriteCloser interface {
 	Reader
 	Writer
 	Closer
+}
+
+type Event struct {
+	Type    string          `json:"type"`
+	Created time.Time       `json:"created"`
+	Payload json.RawMessage `json:"payload,omitempty"`
 }

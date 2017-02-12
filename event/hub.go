@@ -1,9 +1,12 @@
 package event
 
 import (
+	"bytes"
+	"encoding/json"
 	"sync"
 
 	"player/logger"
+	"player/player"
 
 	"github.com/rs/xid"
 )
@@ -14,6 +17,11 @@ var hub *Hub
 // Initialise package with a global hub
 func init() {
 	hub = NewHub()
+}
+
+// Event decoder interface
+type Decoder interface {
+	Decode(v interface{}) error
 }
 
 // Type for holding a list of hub clients
@@ -43,9 +51,10 @@ func (c Clients) Del(id string) {
 type Hub struct {
 	// Exported Fields
 	// Unexported Fields
-	clientsLock *sync.Mutex
-	clients     Clients
-	eventsC     chan []byte
+	clientsLock *sync.Mutex     // Client lock
+	clients     Clients         // Event clients
+	decoder     Decoder         // Event Decoder
+	eventsC     chan []byte     // Event processor channel
 	closeWg     *sync.WaitGroup // Wait for internal coroutines to exit
 	closeC      chan bool       // Closes internal coroutines
 }
@@ -95,11 +104,56 @@ func (h *Hub) ProcessEvents() {
 	for {
 		select {
 		case b := <-h.eventsC:
-			logger.Debug(string(b))
+			go func() {
+				h.closeWg.Add(1)
+				defer h.closeWg.Done()
+				if err := h.handle(b); err != nil {
+					logger.WithFields(logger.F{
+						"event": string(b),
+					}).WithError(err).Error("failed to handle event")
+				}
+			}()
 		case <-h.closeC:
 			return
 		}
 	}
+}
+
+// Decode raw byte data into interface, defaults to json decoder
+func (h *Hub) decode(b []byte, v interface{}) error {
+	decoder := h.decoder
+	if decoder == nil {
+		decoder = json.NewDecoder(bytes.NewReader(b))
+	}
+	return decoder.Decode(v)
+}
+
+// Handles a received event
+func (h *Hub) handle(b []byte) error {
+	event := &Event{}
+	if err := h.decode(b, event); err != nil {
+		return err
+	}
+	var err error
+	switch event.Type {
+	case PauseEvent:
+		err = h.pause(event)
+	case ResumeEvent:
+		err = h.resume(event)
+	}
+	return err
+}
+
+// Pause event handler
+func (h *Hub) pause(event *Event) error {
+	player.Pause()
+	return nil
+}
+
+// Resume event handler
+func (h *Hub) resume(event *Event) error {
+	player.Resume()
+	return nil
 }
 
 // Closes the event hub

@@ -79,7 +79,7 @@ func init() {
 		"c",
 		"",
 		"Optional absolute path to toml config file")
-	playerCmd.AddCommand(buildCmd)
+	playerCmd.AddCommand(buildCmd, pauseCmd, resumeCmd)
 }
 
 func Run() error {
