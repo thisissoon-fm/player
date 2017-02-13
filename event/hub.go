@@ -3,6 +3,7 @@ package event
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"sync"
 
 	"player/logger"
@@ -61,17 +62,20 @@ type Hub struct {
 
 // Goroutine for reading client events
 func (h *Hub) read(rwc ReadWriteCloser) {
+	defer rwc.Close()
 	logger.Debug("start event hub client read")
 	defer logger.Debug("exit event hub client read")
 	h.closeWg.Add(1)
 	defer h.closeWg.Done()
 	for {
-		select {
-		case b := <-rwc.Read():
-			h.eventsC <- b
-		case <-h.closeC:
+		b, err := rwc.Read()
+		if err != nil {
+			if err != io.EOF {
+				logger.WithError(err).Error("unexpected hub read error")
+			}
 			return
 		}
+		h.eventsC <- b
 	}
 }
 

@@ -10,26 +10,13 @@ import (
 	"github.com/rs/xid"
 )
 
-// Map for storing client connections
-type Clients map[string]*Client
-
-// Convenience add client connection to map
-func (c Clients) Add(client *Client) {
-	c[client.id] = client
-}
-
-// Convenience delete client connection from map
-func (c Clients) Del(id string) {
-	delete(c, id)
-}
-
 // A unix socket client
 type Client struct {
 	// Unexported Fields
 	id     string
 	conn   net.Conn
+	server *Server
 	wg     *sync.WaitGroup
-	readC  chan []byte
 	closed bool
 	closeC chan bool
 }
@@ -49,31 +36,10 @@ func (c *Client) Connect(address string) error {
 	return nil
 }
 
-// Goroutine for reading messages from the socket connection
-// and placing them onto a read channel
-func (c *Client) read() {
-	logger.Debug("start unix socket client read loop")
-	defer logger.Debug("exit unix socket client read loop")
-	c.wg.Add(1)
-	defer c.wg.Done()
-	buf := bufio.NewReader(c.conn)
-	for {
-		b, err := buf.ReadBytes('\n') // EOF on connction close
-		if err != nil {
-			logger.WithError(err).Warn("socket client read error")
-			return
-		}
-		c.readC <- b
-	}
-}
-
 // Read data from the socket
-func (c *Client) Read() <-chan []byte {
-	if c.readC == nil {
-		c.readC = make(chan []byte)
-		go c.read()
-	}
-	return (<-chan []byte)(c.readC)
+func (c *Client) Read() ([]byte, error) {
+	buf := bufio.NewReader(c.conn)
+	return buf.ReadBytes('\n') // EOF on connction close
 }
 
 // Writes data to the client unix socket connection
@@ -96,6 +62,9 @@ func (c *Client) Close() error {
 				logger.WithError(err).Error("failed to close socket client conn")
 			}
 		}
+		if c.server != nil {
+			c.server.clients.Del(c.id)
+		}
 		c.closed = true
 		c.wg.Wait()
 	}
@@ -111,9 +80,10 @@ func NewClient() *Client {
 	}
 }
 
-// Constructs a new client with an already open connection
-func NewClientWithConn(conn net.Conn) *Client {
+// Constructs a new server client
+func NewServerClient(server *Server, conn net.Conn) *Client {
 	client := NewClient()
 	client.conn = conn
+	client.server = server
 	return client
 }

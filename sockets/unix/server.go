@@ -9,6 +9,21 @@ import (
 	"player/logger"
 )
 
+// Map for storing client connections
+type Clients map[string]*Client
+
+// Convenience add client connection to map
+func (c Clients) Add(client *Client) {
+	c[client.id] = client
+	event.AddClient(client)
+}
+
+// Convenience delete client connection from map
+func (c Clients) Del(id string) {
+	delete(c, id)
+	event.DelClient(id)
+}
+
 // Socket server type
 type Server struct {
 	// Exported Fields
@@ -48,9 +63,8 @@ func (s *Server) Listen() error {
 				continue
 			}
 		}
-		client := NewClientWithConn(conn)
+		client := NewServerClient(s, conn)
 		s.clients.Add(client)
-		event.AddClient(client)
 		logger.Debug("unix socket client connected")
 	}
 	return nil

@@ -11,7 +11,7 @@ const (
 )
 
 type Reader interface {
-	Read() <-chan []byte
+	Read() ([]byte, error)
 }
 
 type Writer interface {
