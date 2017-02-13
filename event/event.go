@@ -7,6 +7,7 @@ import (
 
 const (
 	PlayEvent   string = "play"
+	StopEvent   string = "stop"
 	PauseEvent  string = "pause"
 	ResumeEvent string = "resume"
 )

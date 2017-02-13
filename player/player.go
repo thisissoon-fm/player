@@ -14,8 +14,9 @@ import (
 var player *Player // Global Player
 
 var (
-	ErrPause           = errors.New("paused")
-	ErrClose           = errors.New("closing")
+	ErrPause           = errors.New("pause playing")
+	ErrStop            = errors.New("stop playing")
+	ErrClose           = errors.New("close player")
 	ErrUnknownProvider = errors.New("unknown provider")
 )
 
@@ -75,6 +76,7 @@ type Player struct {
 	pauseLock *sync.Mutex
 	playing   bool
 	paused    bool
+	stopC     chan bool
 	pauseC    chan bool
 	resumeC   chan bool
 	closeC    chan bool
@@ -127,6 +129,14 @@ func (p *Player) IsPlaying() bool {
 	return p.playing
 }
 
+// Stops playing the current playing track if playing
+func Stop() { player.Stop() }
+func (p *Player) Stop() {
+	if p.playing {
+		p.stopC <- true
+	}
+}
+
 // Play a track from a service
 func Play(provider, id string) error { return player.Play(provider, id) }
 func (p *Player) Play(provider, id string) error {
@@ -158,12 +168,14 @@ func (p *Player) Play(provider, id string) error {
 				select {
 				case <-p.resumeC:
 					continue
+				case <-p.stopC:
+					return nil
 				case <-p.closeC:
 					return nil
 				}
 			case io.ErrShortBuffer:
 				continue // Wait for buffer to fill
-			case io.EOF, ErrClose:
+			case io.EOF, ErrStop, ErrClose:
 				return nil // We are done :)
 			}
 		}
@@ -180,6 +192,8 @@ func (p *Player) stream(r io.Reader) error {
 			return ErrPause
 		case <-p.closeC:
 			return ErrClose
+		case <-p.stopC:
+			return ErrStop
 		default:
 			if _, err := r.Read(data); err != nil {
 				return err
@@ -202,6 +216,7 @@ func New() (*Player, error) {
 		Providers: make(Providers),
 		audio:     audio,
 		pauseLock: &sync.Mutex{},
+		stopC:     make(chan bool),
 		pauseC:    make(chan bool),
 		resumeC:   make(chan bool),
 		closeC:    make(chan bool),

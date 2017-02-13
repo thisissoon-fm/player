@@ -88,6 +88,7 @@ func (h *HTTP) Buffer() error {
 		wn, err := writer.Write(data[:rn])
 		if err != nil {
 			logger.WithError(err).Error("buffer write error")
+			return err
 		}
 		h.buffered += wn
 		if eof {

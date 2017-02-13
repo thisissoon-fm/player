@@ -150,6 +150,8 @@ func (h *Hub) handle(b []byte) error {
 		err = h.resume(event)
 	case PlayEvent:
 		err = h.play(event)
+	case StopEvent:
+		err = h.stop(event)
 	}
 	return err
 }
@@ -178,6 +180,12 @@ func (h *Hub) play(event *Event) error {
 	if err := player.Play(payload.Provider, payload.TrackID); err != nil {
 		return err
 	}
+	return nil
+}
+
+// Stop event handler
+func (h *Hub) stop(event *Event) error {
+	player.Stop()
 	return nil
 }
 
