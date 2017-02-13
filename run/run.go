@@ -18,15 +18,14 @@ func defaultSigChanFunc() chan os.Signal {
 
 // Run this method until the passed in os.Signals are triggered
 // Returns the recieved signal
-func UntilSignal(signals ...os.Signal) os.Signal {
+func UntilSignal(signals ...os.Signal) <-chan os.Signal {
 	ch := SigChanFunc()
 	signal.Notify(ch, signals...)
-	sig := <-ch // Blocking
-	return sig
+	return (<-chan os.Signal)(ch)
 }
 
 // Run until a quit signal is recieved
-func UntilQuit() os.Signal {
+func UntilQuit() <-chan os.Signal {
 	signals := []os.Signal{
 		syscall.SIGINT,
 		syscall.SIGTERM,

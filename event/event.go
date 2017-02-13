@@ -6,10 +6,15 @@ import (
 )
 
 const (
-	PlayEvent   string = "play"
-	StopEvent   string = "stop"
-	PauseEvent  string = "pause"
-	ResumeEvent string = "resume"
+	PlayEvent    string = "player:play"
+	PlayingEvent string = "player:playing"
+	StopEvent    string = "player:stop"
+	StopedEvent  string = "player:stoped"
+	PauseEvent   string = "player:pause"
+	PausedEvent  string = "player:paused"
+	ResumeEvent  string = "player:resume"
+	ResumedEvent string = "player:resumed"
+	ErrorEvent   string = "player:error"
 )
 
 type Reader interface {
@@ -37,6 +42,11 @@ type Event struct {
 }
 
 type PlayPayload struct {
-	Provider string `json:"provider"` // The provider name
-	TrackID  string `json:"trackID"`  // The track id from the provider
+	ProviderID string `json:"providerID"` // The provider ID name (googlemusic, soundcloud)
+	TrackID    string `json:"trackID"`    // The track id from the provider
+	PlaylistID string `json:"playlistID"` // The Playlist ID from the playlist service
+}
+
+type ErrorPayload struct {
+	Error string `json:"error"`
 }

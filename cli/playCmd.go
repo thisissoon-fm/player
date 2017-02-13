@@ -28,8 +28,8 @@ var playCmd = &cobra.Command{
 		}
 		defer client.Close()
 		payload, err := json.Marshal(&event.PlayPayload{
-			Provider: playCmdProvider,
-			TrackID:  playCmdTrackID,
+			ProviderID: playCmdProvider,
+			TrackID:    playCmdTrackID,
 		})
 		if err != nil {
 			fmt.Println("Unable to create play payload:", err)

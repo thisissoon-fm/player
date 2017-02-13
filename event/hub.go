@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"time"
 
 	"player/logger"
 	"player/player"
@@ -86,19 +87,38 @@ func (h *Hub) read(id string, rwc ReadWriteCloser) {
 // returns the client id
 func AddClient(rwc ReadWriteCloser) string { return hub.AddClient(rwc) }
 func (h *Hub) AddClient(rwc ReadWriteCloser) string {
-	h.clientsLock.Lock()
 	id := xid.New().String()
+	logger.Debug("lock event hub clients")
+	h.clientsLock.Lock()
 	h.clients.Add(id, rwc)
-	go h.read(id, rwc)
+	logger.Debug("unlock event hub clients")
 	h.clientsLock.Unlock()
+	go h.read(id, rwc)
 	return id
 }
 
 // Remove a client from the hub
 func DelClient(id string) { hub.DelClient(id) }
 func (h *Hub) DelClient(id string) {
+	logger.Debug("lock event hub clients")
 	h.clientsLock.Lock()
 	h.clients.Del(id)
+	logger.Debug("unlock event hub clients")
+	h.clientsLock.Unlock()
+}
+
+// Broadcast event to all connected clients
+func Broadcast(b []byte) { hub.Broadcast(b) }
+func (h *Hub) Broadcast(b []byte) {
+	logger.Debug("lock event hub clients")
+	h.clientsLock.Lock()
+	for _, client := range h.clients {
+		logger.Debug("write to client")
+		if _, err := client.Write(b); err != nil {
+			logger.WithError(err).Error("failed to write to client")
+		}
+	}
+	logger.Debug("unlock event hub clients")
 	h.clientsLock.Unlock()
 }
 
@@ -138,6 +158,8 @@ func (h *Hub) decode(b []byte, v interface{}) error {
 
 // Handles a received event
 func (h *Hub) handle(b []byte) error {
+	logger.WithField("event", string(b)).Debug("handle event")
+	defer logger.WithField("event", string(b)).Debug("handle event")
 	event := &Event{}
 	if err := h.decode(b, event); err != nil {
 		return err
@@ -158,7 +180,17 @@ func (h *Hub) handle(b []byte) error {
 
 // Pause event handler
 func (h *Hub) pause(event *Event) error {
+	logger.Debug("pause player")
+	defer logger.Debug("player paused")
 	player.Pause()
+	body, err := json.Marshal(&Event{
+		Type:    PausedEvent,
+		Created: time.Now().UTC(),
+	})
+	if err != nil {
+		return err
+	}
+	go h.Broadcast(body)
 	return nil
 }
 
@@ -177,7 +209,7 @@ func (h *Hub) play(event *Event) error {
 	if err := json.Unmarshal(event.Payload, payload); err != nil {
 		return err
 	}
-	if err := player.Play(payload.Provider, payload.TrackID); err != nil {
+	if err := player.Play(payload.ProviderID, payload.TrackID); err != nil {
 		return err
 	}
 	return nil

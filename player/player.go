@@ -99,7 +99,7 @@ func (p *Player) Close() error {
 func Pause() { player.Pause() }
 func (p *Player) Pause() {
 	p.pauseLock.Lock()
-	if !p.IsPaused() {
+	if !p.paused && p.playing {
 		p.paused = true
 		p.pauseC <- true
 	}
@@ -110,7 +110,7 @@ func (p *Player) Pause() {
 func Resume() { player.Resume() }
 func (p *Player) Resume() {
 	p.pauseLock.Lock()
-	if p.IsPaused() {
+	if p.paused && p.playing {
 		p.paused = false
 		p.resumeC <- true
 	}

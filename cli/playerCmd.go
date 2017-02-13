@@ -54,7 +54,7 @@ var playerCmd = &cobra.Command{
 		// Close the player on exit
 		defer player.Close()
 		// Run until os signal
-		sig := run.UntilQuit()
+		sig := <-run.UntilQuit()
 		logger.WithField("sig", sig).Debug("received os signal")
 	},
 }
