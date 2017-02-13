@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	PlayEvent   string = "play"
 	PauseEvent  string = "pause"
 	ResumeEvent string = "resume"
 )
@@ -32,4 +33,9 @@ type Event struct {
 	Type    string          `json:"type"`
 	Created time.Time       `json:"created"`
 	Payload json.RawMessage `json:"payload,omitempty"`
+}
+
+type PlayPayload struct {
+	Provider string `json:"provider"` // The provider name
+	TrackID  string `json:"trackID"`  // The track id from the provider
 }

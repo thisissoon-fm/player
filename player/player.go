@@ -16,7 +16,7 @@ var player *Player // Global Player
 var (
 	ErrPause           = errors.New("paused")
 	ErrClose           = errors.New("closing")
-	ErrUnknownStreamer = errors.New("unknown streamer")
+	ErrUnknownProvider = errors.New("unknown provider")
 )
 
 // Package initalisation
@@ -29,16 +29,16 @@ func init() {
 }
 
 // All streamers must implement this interface
-type Streamer interface {
+type Provider interface {
 	Name() string
 	Stream(track string) (io.ReadCloser, error)
 }
 
-// A store of Streamers
-type Streamers map[string]Streamer
+// A store of providers
+type Providers map[string]Provider
 
 // Get a streamer by name
-func (m Streamers) Get(name string) Streamer {
+func (m Providers) Get(name string) Provider {
 	s, ok := m[name]
 	if !ok {
 		return nil
@@ -47,32 +47,33 @@ func (m Streamers) Get(name string) Streamer {
 }
 
 // Add streamer convenience method
-func (m Streamers) Add(streamer Streamer) {
-	m[streamer.Name()] = streamer
+func (m Providers) Add(p Provider) {
+	m[p.Name()] = p
 }
 
 // Delete streamer convenience method
-func (m Streamers) Del(name string) {
+func (m Providers) Del(name string) {
 	delete(m, name)
 }
 
 // Adds a streamer to the global player streamers
-func AddStreamer(s Streamer) {
-	player.Streamers.Add(s)
+func AddProvider(p Provider) {
+	player.Providers.Add(p)
 }
 
 // Remove a streamer from the global player steamer
-func DelStreamer(s string) {
-	player.Streamers.Del(s)
+func DelProvider(p string) {
+	player.Providers.Del(p)
 }
 
 // Audio Player
 type Player struct {
 	// Exported Fields
-	Streamers Streamers // Service Streamers (google etc)
+	Providers Providers // Service Providers (google etc)
 	// Unexported Fields
 	audio     *pulse.Stream // Audio Stream
 	pauseLock *sync.Mutex
+	playing   bool
 	paused    bool
 	pauseC    chan bool
 	resumeC   chan bool
@@ -115,26 +116,35 @@ func (p *Player) Resume() {
 }
 
 // Returns the player paused state
-func IsPaused() { player.IsPaused() }
+func IsPaused() bool { return player.IsPaused() }
 func (p *Player) IsPaused() bool {
 	return p.paused
 }
 
+// Returns the player playing state
+func IsPlaying() bool { return player.IsPlaying() }
+func (p *Player) IsPlaying() bool {
+	return p.playing
+}
+
 // Play a track from a service
-func Play(s, t string) error { return player.Play(s, t) }
-func (p *Player) Play(s, t string) error {
-	f := logger.F{"service": s, "track": t}
+func Play(provider, id string) error { return player.Play(provider, id) }
+func (p *Player) Play(provider, id string) error {
+	f := logger.F{"provider": provider, "track": id}
 	logger.WithFields(f).Info("play track")
 	defer logger.WithFields(f).Info("finished track")
-	// Reset Pause State
+	// Set state
+	p.playing = true
+	defer func(p *Player) { p.playing = false }(p)
 	p.paused = false
+	defer func(p *Player) { p.paused = false }(p)
 	// Get the streamer
-	streamer := p.Streamers.Get(s)
-	if streamer == nil {
-		return ErrUnknownStreamer
+	prvdr := p.Providers.Get(provider)
+	if p == nil {
+		return ErrUnknownProvider
 	}
 	// Get track stream
-	stream, err := streamer.Stream(t)
+	stream, err := prvdr.Stream(id)
 	if err != nil {
 		return err
 	}
@@ -182,23 +192,19 @@ func (p *Player) stream(r io.Reader) error {
 }
 
 // Consturcts a new Player with the given steamers
-func New(s ...Streamer) (*Player, error) {
+func New() (*Player, error) {
 	spec := pulse.SampleSpec{pulse.SAMPLE_S16LE, 44100, 2}
 	audio, err := pulse.Playback("sfm", "sfm", &spec)
 	if err != nil {
 		return nil, err
 	}
-	streamers := make(Streamers)
-	for _, streamer := range s {
-		streamers.Add(streamer)
-	}
-	p := &Player{
-		Streamers: streamers,
+	player := &Player{
+		Providers: make(Providers),
 		audio:     audio,
 		pauseLock: &sync.Mutex{},
 		pauseC:    make(chan bool),
 		resumeC:   make(chan bool),
 		closeC:    make(chan bool),
 	}
-	return p, nil
+	return player, nil
 }

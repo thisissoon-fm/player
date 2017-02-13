@@ -3,6 +3,7 @@ package event
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"sync"
 
@@ -14,6 +15,9 @@ import (
 
 // Global hub
 var hub *Hub
+
+// Already playing a track
+var ErrPlaying = errors.New("player is playing")
 
 // Initialise package with a global hub
 func init() {
@@ -144,6 +148,8 @@ func (h *Hub) handle(b []byte) error {
 		err = h.pause(event)
 	case ResumeEvent:
 		err = h.resume(event)
+	case PlayEvent:
+		err = h.play(event)
 	}
 	return err
 }
@@ -157,6 +163,21 @@ func (h *Hub) pause(event *Event) error {
 // Resume event handler
 func (h *Hub) resume(event *Event) error {
 	player.Resume()
+	return nil
+}
+
+// Play event handler
+func (h *Hub) play(event *Event) error {
+	if player.IsPlaying() {
+		return ErrPlaying
+	}
+	payload := &PlayPayload{}
+	if err := json.Unmarshal(event.Payload, payload); err != nil {
+		return err
+	}
+	if err := player.Play(payload.Provider, payload.TrackID); err != nil {
+		return err
+	}
 	return nil
 }
 
