@@ -15,13 +15,11 @@ type Clients map[string]*Client
 // Convenience add client connection to map
 func (c Clients) Add(client *Client) {
 	c[client.id] = client
-	event.AddClient(client)
 }
 
 // Convenience delete client connection from map
 func (c Clients) Del(id string) {
 	delete(c, id)
-	event.DelClient(id)
 }
 
 // Socket server type
@@ -63,11 +61,17 @@ func (s *Server) Listen() error {
 				continue
 			}
 		}
-		client := NewServerClient(s, conn)
-		s.clients.Add(client)
-		logger.Debug("unix socket client connected")
+		s.newClientConn(conn)
 	}
 	return nil
+}
+
+// Adds the client to the server and adds it to the event hub
+func (s *Server) newClientConn(conn net.Conn) {
+	defer logger.Debug("unix socket client connected")
+	client := NewServerClient(s, conn)
+	s.clients.Add(client)
+	event.AddClient(client)
 }
 
 // Gracefully closes the socket connection, waits for the all connected

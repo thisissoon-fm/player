@@ -39,7 +39,16 @@ func (c *Client) Connect(address string) error {
 // Read data from the socket
 func (c *Client) Read() ([]byte, error) {
 	buf := bufio.NewReader(c.conn)
-	return buf.ReadBytes('\n') // EOF on connction close
+	b, err := buf.ReadBytes('\n') // EOF on connction close
+	if err != nil {
+		// On read error we close the client, it's likely that
+		// the client has gone away so we can't read or write from
+		// it anymore
+		if err := c.Close(); err != nil {
+			logger.WithError(err).Error("error closing socket client on read error")
+		}
+	}
+	return b, err
 }
 
 // Writes data to the client unix socket connection
@@ -53,9 +62,9 @@ func (c *Client) Write(b []byte) (int, error) {
 
 // Close the Client, closing the connection
 func (c *Client) Close() error {
-	logger.Debug("close socket client")
-	defer logger.Info("closed socket client")
 	if !c.closed {
+		logger.Debug("close socket client")
+		defer logger.Info("closed socket client")
 		close(c.closeC)
 		if c.conn != nil {
 			if err := c.conn.Close(); err != nil {

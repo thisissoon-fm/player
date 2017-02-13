@@ -38,8 +38,7 @@ func (c Clients) Get(id string) ReadWriteCloser {
 }
 
 // Add client convenience method returning the client id
-func (c Clients) Add(rwc ReadWriteCloser) string {
-	id := xid.New().String()
+func (c Clients) Add(id string, rwc ReadWriteCloser) string {
 	c[id] = rwc
 	return id
 }
@@ -61,19 +60,19 @@ type Hub struct {
 }
 
 // Goroutine for reading client events
-func (h *Hub) read(rwc ReadWriteCloser) {
-	defer rwc.Close()
+func (h *Hub) read(id string, rwc ReadWriteCloser) {
 	logger.Debug("start event hub client read")
 	defer logger.Debug("exit event hub client read")
 	h.closeWg.Add(1)
 	defer h.closeWg.Done()
+	defer h.DelClient(id) // Remove the client from the hub
 	for {
 		b, err := rwc.Read()
 		if err != nil {
 			if err != io.EOF {
 				logger.WithError(err).Error("unexpected hub read error")
 			}
-			return
+			return // Exit on any error
 		}
 		h.eventsC <- b
 	}
@@ -84,8 +83,9 @@ func (h *Hub) read(rwc ReadWriteCloser) {
 func AddClient(rwc ReadWriteCloser) string { return hub.AddClient(rwc) }
 func (h *Hub) AddClient(rwc ReadWriteCloser) string {
 	h.clientsLock.Lock()
-	id := h.clients.Add(rwc)
-	go h.read(rwc)
+	id := xid.New().String()
+	h.clients.Add(id, rwc)
+	go h.read(id, rwc)
 	h.clientsLock.Unlock()
 	return id
 }
