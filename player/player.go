@@ -96,25 +96,29 @@ func (p *Player) Close() error {
 }
 
 // Pause the player
-func Pause() { player.Pause() }
-func (p *Player) Pause() {
+func Pause() bool { return player.Pause() }
+func (p *Player) Pause() bool {
 	p.pauseLock.Lock()
+	defer p.pauseLock.Unlock()
 	if !p.paused && p.playing {
 		p.paused = true
 		p.pauseC <- true
+		return true
 	}
-	p.pauseLock.Unlock()
+	return false
 }
 
 // Resume the player
-func Resume() { player.Resume() }
-func (p *Player) Resume() {
+func Resume() bool { return player.Resume() }
+func (p *Player) Resume() bool {
 	p.pauseLock.Lock()
+	defer p.pauseLock.Unlock()
 	if p.paused && p.playing {
 		p.paused = false
 		p.resumeC <- true
+		return true
 	}
-	p.pauseLock.Unlock()
+	return false
 }
 
 // Returns the player paused state

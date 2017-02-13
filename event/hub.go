@@ -159,7 +159,7 @@ func (h *Hub) decode(b []byte, v interface{}) error {
 // Handles a received event
 func (h *Hub) handle(b []byte) error {
 	logger.WithField("event", string(b)).Debug("handle event")
-	defer logger.WithField("event", string(b)).Debug("handle event")
+	defer logger.WithField("event", string(b)).Debug("handled event")
 	event := &Event{}
 	if err := h.decode(b, event); err != nil {
 		return err
@@ -181,22 +181,34 @@ func (h *Hub) handle(b []byte) error {
 // Pause event handler
 func (h *Hub) pause(event *Event) error {
 	logger.Debug("pause player")
-	defer logger.Debug("player paused")
-	player.Pause()
-	body, err := json.Marshal(&Event{
-		Type:    PausedEvent,
-		Created: time.Now().UTC(),
-	})
-	if err != nil {
-		return err
+	if player.Pause() {
+		defer logger.Debug("player paused")
+		body, err := json.Marshal(&Event{
+			Type:    PausedEvent,
+			Created: time.Now().UTC(),
+		})
+		if err != nil {
+			return err
+		}
+		go h.Broadcast(body)
 	}
-	go h.Broadcast(body)
 	return nil
 }
 
 // Resume event handler
 func (h *Hub) resume(event *Event) error {
-	player.Resume()
+	logger.Debug("resume player")
+	if player.Resume() {
+		defer logger.Debug("resumed paused")
+		body, err := json.Marshal(&Event{
+			Type:    ResumedEvent,
+			Created: time.Now().UTC(),
+		})
+		if err != nil {
+			return err
+		}
+		go h.Broadcast(body)
+	}
 	return nil
 }
 

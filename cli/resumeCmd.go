@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"player/event"
+	"player/run"
 	"player/sockets/unix"
 
 	"github.com/spf13/cobra"
@@ -13,8 +14,9 @@ import (
 
 var resumeCmd = &cobra.Command{
 	Use:   "resume",
-	Short: "Resumes the player",
+	Short: "Resume the player",
 	Run: func(cmd *cobra.Command, args []string) {
+		defer fmt.Println("Done")
 		config := unix.NewConfig()
 		client := unix.NewClient()
 		if err := client.Connect(config.Address()); err != nil {
@@ -30,11 +32,38 @@ var resumeCmd = &cobra.Command{
 			fmt.Println("Unable to create resume event:", err)
 			return
 		}
-		fmt.Println("Pausing Player...")
+		fmt.Println("Resume Player...")
 		if _, err := client.Write(eb); err != nil {
 			fmt.Println("Unable to send resume event:", err)
 			return
 		}
-		fmt.Println("Done")
+		exitC := make(chan bool)
+		go func() {
+			for {
+				b, err := client.Read()
+				if err != nil {
+					close(exitC)
+					return
+				}
+				e := &event.Event{}
+				if err := json.Unmarshal(b, e); err != nil {
+					fmt.Println("error reading event:", err)
+				}
+				if e.Type == event.ResumedEvent {
+					fmt.Println("Playback resumed")
+					close(exitC)
+				}
+			}
+		}()
+		deadline := time.Second * 30
+		select {
+		case <-exitC:
+			return
+		case <-run.UntilQuit():
+			return
+		case <-time.After(deadline):
+			fmt.Println("no response from player after", deadline)
+			return
+		}
 	},
 }

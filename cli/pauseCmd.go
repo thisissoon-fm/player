@@ -50,7 +50,7 @@ var pauseCmd = &cobra.Command{
 					fmt.Println("error reading event:", err)
 				}
 				if e.Type == event.PausedEvent {
-					fmt.Println("Played paused")
+					fmt.Println("Playback paused")
 					close(exitC)
 				}
 			}
