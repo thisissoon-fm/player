@@ -4,10 +4,25 @@ package googlemusic
 
 import (
 	"io"
+
 	"player/buffer"
 
+	"github.com/korandiz/mpa"
 	"github.com/krak3n/gmusic"
 )
+
+type GoogleMusicStream struct {
+	buffer  *buffer.HTTP
+	decoder *mpa.Reader
+}
+
+func (gms *GoogleMusicStream) Read(dst []byte) (int, error) {
+	return gms.decoder.Read(dst)
+}
+
+func (gms *GoogleMusicStream) Close() error {
+	return gms.buffer.Close()
+}
 
 // Login Interface
 type LoginHandler interface {
@@ -53,7 +68,11 @@ func (p *Player) Stream(track string) (io.ReadCloser, error) {
 	// Createa http stream buffer
 	buff := buffer.HTTPBuffer(rsp)
 	go buff.Buffer() // Start buffering
-	return buff, nil
+	gms := &GoogleMusicStream{
+		buffer:  buff,
+		decoder: &mpa.Reader{Decoder: &mpa.Decoder{Input: buff}},
+	}
+	return gms, nil
 }
 
 // Constructs a new Player

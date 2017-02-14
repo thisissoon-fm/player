@@ -5,8 +5,24 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+
 	"player/buffer"
+
+	"github.com/korandiz/mpa"
 )
+
+type SoundCloudStream struct {
+	buffer  *buffer.HTTP
+	decoder *mpa.Reader
+}
+
+func (scs *SoundCloudStream) Read(dst []byte) (int, error) {
+	return scs.decoder.Read(dst)
+}
+
+func (scs *SoundCloudStream) Close() error {
+	return scs.buffer.Close()
+}
 
 // Soundcloud Player
 type SoundCloud struct {
@@ -45,7 +61,11 @@ func (sc *SoundCloud) Stream(track string) (io.ReadCloser, error) {
 	// Createa http stream buffer
 	buff := buffer.HTTPBuffer(rsp)
 	go buff.Buffer() // Start buffering
-	return buff, nil
+	scs := &SoundCloudStream{
+		buffer:  buff,
+		decoder: &mpa.Reader{Decoder: &mpa.Decoder{Input: buff}},
+	}
+	return scs, nil
 }
 
 // Constructs a new player

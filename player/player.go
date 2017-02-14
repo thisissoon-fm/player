@@ -7,7 +7,6 @@ import (
 
 	"player/logger"
 
-	"github.com/korandiz/mpa"
 	pulse "github.com/mesilliac/pulse-simple"
 )
 
@@ -79,6 +78,7 @@ type Player struct {
 	stopC     chan bool
 	pauseC    chan bool
 	resumeC   chan bool
+	closeWg   *sync.WaitGroup
 	closeC    chan bool
 }
 
@@ -92,6 +92,7 @@ func (p *Player) Close() error {
 		p.audio.Drain()
 		p.audio.Free()
 	}
+	p.closeWg.Wait() // Wait for play routines to exit
 	return nil
 }
 
@@ -134,24 +135,22 @@ func (p *Player) IsPlaying() bool {
 }
 
 // Stops playing the current playing track if playing
-func Stop() { player.Stop() }
-func (p *Player) Stop() {
+func Stop() bool { return player.Stop() }
+func (p *Player) Stop() bool {
 	if p.playing {
 		p.stopC <- true
+		return true
 	}
+	return false
 }
 
 // Play a track from a service
 func Play(provider, id string) error { return player.Play(provider, id) }
 func (p *Player) Play(provider, id string) error {
-	f := logger.F{"provider": provider, "track": id}
-	logger.WithFields(f).Info("play track")
-	defer logger.WithFields(f).Info("finished track")
-	// Set state
-	p.playing = true
-	defer func(p *Player) { p.playing = false }(p)
-	p.paused = false
-	defer func(p *Player) { p.paused = false }(p)
+	logger.WithFields(logger.F{
+		"provider": provider,
+		"track":    id,
+	}).Info("play track")
 	// Get the streamer
 	prvdr := p.Providers.Get(provider)
 	if p == nil {
@@ -162,11 +161,26 @@ func (p *Player) Play(provider, id string) error {
 	if err != nil {
 		return err
 	}
+	go p.play(stream) // Fire play goroutine
+	return nil
+}
+
+// Plays a track, handling pause / resume / stop events
+func (p *Player) play(stream io.ReadCloser) error {
+	logger.Debug("playing stream")
+	defer logger.Debug("stopped playing stream")
+	// Close orchestration
+	p.closeWg.Add(1)
+	defer p.closeWg.Done()
+	// Set state
+	p.playing = true
+	p.paused = false
+	defer func(p *Player) { p.playing = false }(p)
+	defer func(p *Player) { p.paused = false }(p)
+	// Close the stream
 	defer stream.Close()
-	// MPEG Decoder
-	decoder := &mpa.Reader{Decoder: &mpa.Decoder{Input: stream}}
 	for { // Stream the file
-		if err := p.stream(decoder); err != nil {
+		if err := p.stream(stream); err != nil {
 			switch err {
 			case ErrPause: // If paused, wait for resume or close
 				select {
@@ -184,7 +198,6 @@ func (p *Player) Play(provider, id string) error {
 			}
 		}
 	}
-	return nil
 }
 
 // Stream routine, takes a reader
@@ -223,6 +236,7 @@ func New() (*Player, error) {
 		stopC:     make(chan bool),
 		pauseC:    make(chan bool),
 		resumeC:   make(chan bool),
+		closeWg:   &sync.WaitGroup{},
 		closeC:    make(chan bool),
 	}
 	return player, nil
