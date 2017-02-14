@@ -51,6 +51,12 @@
 			"revisionTime": "2016-11-16T19:01:28Z"
 		},
 		{
+			"checksumSHA1": "++qMWbJ7ptiXehuLTFtEDGGnwpM=",
+			"path": "github.com/gorilla/websocket",
+			"revision": "9bc973af0682dc73a22553a08bfe00ee6255f56f",
+			"revisionTime": "2017-02-13T18:21:13Z"
+		},
+		{
 			"checksumSHA1": "Ok3Csn6Voou7pQT6Dv2mkwpqFtw=",
 			"path": "github.com/hashicorp/hcl",
 			"revision": "372e8ddaa16fd67e371e9323807d056b799360af",
