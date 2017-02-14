@@ -45,16 +45,16 @@ The player responds to and emits certain events.
 The `sfmplayer` will connect to a remote web socket service and will subscribe
 to the following event topics:
 
-* `playlist:track:added`: This event is fired when a new track is added to the playlist.
-* `playlist:track:deleted`: Fired when a track is removed from the playlist.
-* `player:pause`: Fired when a user wants the player to puase playing a track.
-* `player:stop`: Fired when the current track should stop playing.
+* `player:play`: Fired when a track should start playing.
+* `player:pause`: Fired to pause the player.
+* `player:resume`: Fired to resume player playback.
+* `player:stop`: Fired to stop the current track.
 
 ## Emitted Events
 
 The player will emit the following events:
 
 * `player:playing`: Fired when the player starts playing a track.
-* `player:paused`: Fired when the player has pauded playing a track
+* `player:paused`: Fired when the player has paued playing a track
 * `player:resumed`: Fired when the player has resumed playing.
 * `player:stopped`: Fired when the player has finished playing a track.

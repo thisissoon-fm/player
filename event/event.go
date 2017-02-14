@@ -9,7 +9,7 @@ const (
 	PlayEvent    string = "player:play"
 	PlayingEvent string = "player:playing"
 	StopEvent    string = "player:stop"
-	StopedEvent  string = "player:stoped"
+	StoppedEvent string = "player:stopped"
 	PauseEvent   string = "player:pause"
 	PausedEvent  string = "player:paused"
 	ResumeEvent  string = "player:resume"

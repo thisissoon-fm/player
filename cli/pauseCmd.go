@@ -39,19 +39,27 @@ var pauseCmd = &cobra.Command{
 		}
 		exitC := make(chan bool)
 		go func() {
+			defer close(exitC)
 			for {
 				b, err := client.Read()
 				if err != nil {
-					close(exitC)
 					return
 				}
 				e := &event.Event{}
 				if err := json.Unmarshal(b, e); err != nil {
 					fmt.Println("error reading event:", err)
 				}
-				if e.Type == event.PausedEvent {
+				switch e.Type {
+				case event.PausedEvent:
 					fmt.Println("Playback paused")
-					close(exitC)
+					return
+				case event.ErrorEvent:
+					payload := &event.ErrorPayload{}
+					if err := json.Unmarshal(e.Payload, payload); err != nil {
+						fmt.Println("Unable to process error")
+					}
+					fmt.Println("Error pausing player:", payload.Error)
+					return
 				}
 			}
 		}()

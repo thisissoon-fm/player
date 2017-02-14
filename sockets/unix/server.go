@@ -71,7 +71,7 @@ func (s *Server) newClientConn(conn net.Conn) {
 	defer logger.Debug("unix socket client connected")
 	client := NewServerClient(s, conn)
 	s.clients.Add(client)
-	event.AddClient(client)
+	event.Add(client)
 }
 
 // Gracefully closes the socket connection, waits for the all connected

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"player/event"
+	"player/run"
 	"player/sockets/unix"
 
 	"github.com/spf13/cobra"
@@ -27,6 +28,10 @@ var playCmd = &cobra.Command{
 			return
 		}
 		defer client.Close()
+		if playCmdProvider == "" || playCmdTrackID == "" {
+			fmt.Println("Need a provider and a track ID")
+			return
+		}
 		payload, err := json.Marshal(&event.PlayPayload{
 			ProviderID: playCmdProvider,
 			TrackID:    playCmdTrackID,
@@ -44,12 +49,46 @@ var playCmd = &cobra.Command{
 			fmt.Println("Unable to create play event:", err)
 			return
 		}
-		fmt.Println("Playing track...")
 		if _, err := client.Write(body); err != nil {
 			fmt.Println("Unable to send play event:", err)
 			return
 		}
-		fmt.Println("Done")
+		exitC := make(chan bool)
+		go func() {
+			defer close(exitC)
+			for {
+				b, err := client.Read()
+				if err != nil {
+					return
+				}
+				e := &event.Event{}
+				if err := json.Unmarshal(b, e); err != nil {
+					fmt.Println("error reading event:", err)
+				}
+				switch e.Type {
+				case event.PlayingEvent:
+					fmt.Println("Playing track")
+					return
+				case event.ErrorEvent:
+					payload := &event.ErrorPayload{}
+					if err := json.Unmarshal(e.Payload, payload); err != nil {
+						fmt.Println("Unable to process error")
+					}
+					fmt.Println("Error playing track:", payload.Error)
+					return
+				}
+			}
+		}()
+		deadline := time.Second * 30
+		select {
+		case <-exitC:
+			return
+		case <-run.UntilQuit():
+			return
+		case <-time.After(deadline):
+			fmt.Println("no response from player after", deadline)
+			return
+		}
 	},
 }
 

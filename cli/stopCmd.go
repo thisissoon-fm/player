@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"player/event"
+	"player/run"
 	"player/sockets/unix"
 
 	"github.com/spf13/cobra"
@@ -13,8 +14,9 @@ import (
 
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop the player if it's playing",
+	Short: "Stop the player",
 	Run: func(cmd *cobra.Command, args []string) {
+		defer fmt.Println("Done")
 		config := unix.NewConfig()
 		client := unix.NewClient()
 		if err := client.Connect(config.Address()); err != nil {
@@ -30,11 +32,46 @@ var stopCmd = &cobra.Command{
 			fmt.Println("Unable to create stop event:", err)
 			return
 		}
-		fmt.Println("Stop Player...")
+		fmt.Println("Stopping Player...")
 		if _, err := client.Write(eb); err != nil {
 			fmt.Println("Unable to send stop event:", err)
 			return
 		}
-		fmt.Println("Done")
+		exitC := make(chan bool)
+		go func() {
+			defer close(exitC)
+			for {
+				b, err := client.Read()
+				if err != nil {
+					return
+				}
+				e := &event.Event{}
+				if err := json.Unmarshal(b, e); err != nil {
+					fmt.Println("error reading event:", err)
+				}
+				switch e.Type {
+				case event.StoppedEvent:
+					fmt.Println("Playback stopped")
+					return
+				case event.ErrorEvent:
+					payload := &event.ErrorPayload{}
+					if err := json.Unmarshal(e.Payload, payload); err != nil {
+						fmt.Println("Unable to process error")
+					}
+					fmt.Println("Error resuming player:", payload.Error)
+					return
+				}
+			}
+		}()
+		deadline := time.Second * 30
+		select {
+		case <-exitC:
+			return
+		case <-run.UntilQuit():
+			return
+		case <-time.After(deadline):
+			fmt.Println("no response from player after", deadline)
+			return
+		}
 	},
 }
