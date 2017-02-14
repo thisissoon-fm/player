@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 
+	"player/event"
 	"player/logger"
 
 	"github.com/rs/xid"
@@ -62,6 +63,7 @@ func (c *Client) Write(b []byte) (int, error) {
 
 // Close the Client, closing the connection
 func (c *Client) Close() error {
+	event.Del(c) // Delete the client from the event hub
 	if !c.closed {
 		logger.Debug("close socket client")
 		defer logger.Info("closed socket client")

@@ -77,7 +77,7 @@ func (s *Server) newClientConn(conn net.Conn) {
 // Gracefully closes the socket connection, waits for the all connected
 // client connections to close and listener loops
 func (s *Server) Close() error {
-	logger.Debug("close socket server close")
+	logger.Debug("close socket server")
 	defer logger.Info("closed socket server")
 	defer os.Remove(s.Config.Address())
 	if s.closeC != nil {

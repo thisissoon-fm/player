@@ -10,8 +10,6 @@ import (
 
 	"player/logger"
 	"player/player"
-
-	"github.com/rs/xid"
 )
 
 // Global event hub
@@ -37,6 +35,7 @@ type Decoder interface {
 
 // Client interface
 type Client interface {
+	ID() string
 	Read() ([]byte, error)
 	Write([]byte) (int, error)
 	Close() error
@@ -46,14 +45,13 @@ type Client interface {
 type Clients map[string]Client
 
 // Add client convenience method returning the client id
-func (c Clients) Add(id string, client Client) string {
-	c[id] = client
-	return id
+func (c Clients) Add(client Client) {
+	c[client.ID()] = client
 }
 
 // Delete client convenience method
-func (c Clients) Del(id string) {
-	delete(c, id)
+func (c Clients) Del(client Client) {
+	delete(c, client.ID())
 }
 
 // Client events
@@ -75,16 +73,24 @@ type Hub struct {
 }
 
 // Add clients to the hub
-func Add(client Client) string { return hub.Add(client) }
-func (hub *Hub) Add(client Client) string {
+func Add(client Client) { hub.Add(client) }
+func (hub *Hub) Add(client Client) {
 	logger.Debug("add hub client")
-	defer logger.Debug("added hub client")
 	hub.clientsLock.Lock()
-	defer hub.clientsLock.Unlock()
-	id := xid.New().String()
-	hub.clients.Add(id, client)
-	go hub.read(id, client)
-	return id
+	hub.clients.Add(client)
+	go hub.read(client)
+	hub.clientsLock.Unlock()
+	logger.Debug("added hub client")
+}
+
+// Delete client from Hub
+func Del(client Client) { hub.Del(client) }
+func (hub *Hub) Del(client Client) {
+	logger.Debug("delete hub client")
+	hub.clientsLock.Lock()
+	hub.clients.Del(client)
+	hub.clientsLock.Unlock()
+	logger.Debug("deleted hub client")
 }
 
 // Process incoming events from clients
@@ -107,7 +113,7 @@ func (hub *Hub) ProcessEvents() {
 // Broadcast an event to all connected clients
 func Broadcast(event Event) error { return hub.Broadcast(event) }
 func (hub *Hub) Broadcast(event Event) error {
-	body, err := json.Marshal(event)
+	body, err := json.Marshal(&event)
 	if err != nil {
 		return err
 	}
@@ -143,12 +149,11 @@ func (hub *Hub) decode(b []byte, v interface{}) error {
 
 // Reads messages from an attached client, decoding the raw json event
 // and placing it onto the events channel for processing
-func (hub *Hub) read(id string, client Client) error {
+func (hub *Hub) read(client Client) error {
 	logger.Debug("start client read loop")
 	defer logger.Debug("exit client read loop")
 	hub.closeWg.Add(1)
 	defer hub.closeWg.Done()
-	defer hub.clients.Del(id)
 	for { // Read from the client
 		raw, err := client.Read() // Blocking
 		if err != nil {
@@ -347,9 +352,6 @@ func (hub *Hub) resumedPlayer(ce ClientEvent) error {
 // player stream. On success a playing event will be published.
 func (hub *Hub) playTrack(ce ClientEvent) error {
 	logger.Debug("handle play event")
-	if player.IsPlaying() {
-		return ErrPlaying
-	}
 	payload := &PlayPayload{}
 	if err := json.Unmarshal(ce.Event.Payload, payload); err != nil {
 		return err
@@ -362,7 +364,7 @@ func (hub *Hub) playTrack(ce ClientEvent) error {
 		if err != nil {
 			return err
 		}
-		body, err := json.Marshal(Event{
+		body, err := json.Marshal(&Event{
 			Type:    ErrorEvent,
 			Created: time.Now().UTC(),
 			Payload: json.RawMessage(payload),
@@ -398,7 +400,7 @@ func (hub *Hub) playingTrack(ce ClientEvent) error {
 		if err != nil {
 			return err
 		}
-		body, err := json.Marshal(Event{
+		body, err := json.Marshal(&Event{
 			Type:    ErrorEvent,
 			Created: time.Now().UTC(),
 			Payload: json.RawMessage(payload),
@@ -460,7 +462,7 @@ func (hub *Hub) stoppedPlayer(ce ClientEvent) error {
 		if err != nil {
 			return err
 		}
-		body, err := json.Marshal(Event{
+		body, err := json.Marshal(&Event{
 			Type:    ErrorEvent,
 			Created: time.Now().UTC(),
 			Payload: json.RawMessage(payload),

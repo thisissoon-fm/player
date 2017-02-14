@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-
 	"player/config"
 	"player/event"
 	"player/logger"
@@ -11,6 +10,7 @@ import (
 	"player/providers/soundcloud"
 	"player/run"
 	"player/sockets/unix"
+	"player/sockets/web"
 
 	"github.com/spf13/cobra"
 )
@@ -37,6 +37,10 @@ var playerCmd = &cobra.Command{
 		// Event Hub
 		go event.ProcessEvents()
 		defer event.Close()
+		// Websocket Client
+		websocket := web.New(web.NewConfig())
+		go websocket.Connect()
+		defer websocket.Close()
 		// Start a unix socket server for IPC
 		unixsock := unix.NewServer(unix.NewConfig())
 		go unixsock.Listen()

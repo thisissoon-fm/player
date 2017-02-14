@@ -13,6 +13,7 @@ import (
 var player *Player // Global Player
 
 var (
+	ErrPlaying         = errors.New("cannot play, player is currently playing")
 	ErrPause           = errors.New("pause playing")
 	ErrStop            = errors.New("stop playing")
 	ErrClose           = errors.New("close player")
@@ -78,7 +79,7 @@ type Player struct {
 	stopC     chan bool
 	pauseC    chan bool
 	resumeC   chan bool
-	closeWg   *sync.WaitGroup
+	playWg    *sync.WaitGroup
 	closeC    chan bool
 }
 
@@ -92,7 +93,7 @@ func (p *Player) Close() error {
 		p.audio.Drain()
 		p.audio.Free()
 	}
-	p.closeWg.Wait() // Wait for play routines to exit
+	p.playWg.Wait() // Wait for play routines to exit
 	return nil
 }
 
@@ -139,6 +140,7 @@ func Stop() bool { return player.Stop() }
 func (p *Player) Stop() bool {
 	if p.playing {
 		p.stopC <- true
+		p.playWg.Wait() // Wait for play routines to exit before returning
 		return true
 	}
 	return false
@@ -151,6 +153,9 @@ func (p *Player) Play(provider, id string) error {
 		"provider": provider,
 		"track":    id,
 	}).Info("play track")
+	if p.playing {
+		return ErrPlaying
+	}
 	// Get the streamer
 	prvdr := p.Providers.Get(provider)
 	if p == nil {
@@ -170,8 +175,8 @@ func (p *Player) play(stream io.ReadCloser) error {
 	logger.Debug("playing stream")
 	defer logger.Debug("stopped playing stream")
 	// Close orchestration
-	p.closeWg.Add(1)
-	defer p.closeWg.Done()
+	p.playWg.Add(1)
+	defer p.playWg.Done()
 	// Set state
 	p.playing = true
 	p.paused = false
@@ -236,7 +241,7 @@ func New() (*Player, error) {
 		stopC:     make(chan bool),
 		pauseC:    make(chan bool),
 		resumeC:   make(chan bool),
-		closeWg:   &sync.WaitGroup{},
+		playWg:    &sync.WaitGroup{},
 		closeC:    make(chan bool),
 	}
 	return player, nil
