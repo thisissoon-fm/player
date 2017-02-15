@@ -5,7 +5,6 @@ package buffer
 import (
 	"bufio"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -65,9 +64,12 @@ func (h *HTTP) Buffer() error {
 	defer logger.WithFields(f).Debug("finished buffering")
 	defer h.Response.Body.Close() // Close the HTTP Response body once we are done
 	// Make the buffer
-	if err := h.mkBuffer(); err != nil {
+	file, buff, err := Make(h.Response.ContentLength)
+	if err != nil {
 		return err
 	}
+	h.file = file
+	h.buffer = buff
 	var eof bool
 	data := make([]byte, 1024*8) // Read response data into here
 	writer := bufio.NewWriter(h.buffer)
@@ -95,20 +97,6 @@ func (h *HTTP) Buffer() error {
 			return nil
 		}
 	}
-}
-
-// Makes a buffer to store the HTTP stream to a temporary file
-func (h *HTTP) mkBuffer() error {
-	logger.Debug("make buffer")
-	f, err := ioutil.TempFile(os.TempDir(), "sfmplayer.buffer")
-	if err != nil {
-		return err
-	}
-	logger.WithField("path", f.Name()).Debug("tmp file created")
-	b := buffer.NewFile(h.Response.ContentLength, f)
-	h.buffer = b
-	h.file = f
-	return nil
 }
 
 // Construct a new HTTP Buffer for a HTTP Response

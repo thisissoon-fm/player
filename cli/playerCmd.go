@@ -2,12 +2,14 @@ package cli
 
 import (
 	"fmt"
+
 	"player/config"
 	"player/event"
 	"player/logger"
 	"player/player"
 	"player/providers/googlemusic"
 	"player/providers/soundcloud"
+	"player/providers/spotify"
 	"player/run"
 	"player/sockets/unix"
 	"player/sockets/web"
@@ -52,9 +54,17 @@ var playerCmd = &cobra.Command{
 			return
 		}
 		player.AddProvider(gmp)
-		// SoundCloud Provider
+		// // SoundCloud Provider
 		scp := soundcloud.New(soundcloud.NewConfig())
 		player.AddProvider(scp)
+		// Spotify Provider
+		sp, err := spotify.New(spotify.NewConfig())
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer sp.Close()
+		player.AddProvider(sp)
 		// Close the player on exit
 		defer player.Close()
 		// Run until os signal
