@@ -159,6 +159,12 @@
 			"revisionTime": "2015-04-15T17:42:59Z"
 		},
 		{
+			"checksumSHA1": "+BnUifmn5LUBxqZvZjvPWe1W0vw=",
+			"path": "github.com/op/go-libspotify/spotify",
+			"revision": "12dd11fb33ecf760c356b65dc1116bc92589dea4",
+			"revisionTime": "2015-04-15T17:42:59Z"
+		},
+		{
 			"checksumSHA1": "8Y05Pz7onrQPcVWW6JStSsYRh6E=",
 			"path": "github.com/pelletier/go-buffruneio",
 			"revision": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d",
