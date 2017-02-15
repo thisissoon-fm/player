@@ -7,12 +7,15 @@ RUN /bin/sh -c '\
         && apt-get update \
         && apt-get -t jessie-backports install golang -y'
 
-# Install libpulse-dev into the raspbian vm
-RUN install-raspbian --update libpulse-dev
+# Install Raspbian Dependencies
+COPY mopidy.apt.sources.list /rpxc/sysroot/etc/apt/sources.list.d/mopidy.sources.list
+COPY mopidy.gpg /rpxc/sysroot/etc/apt/mopidy.gpg
+RUN rpdo apt-key add /etc/apt/mopidy.gpg
+RUN install-raspbian --update libpulse-dev libspotify-dev
 
 # ENVs
 ENV CC=arm-linux-gnueabihf-gcc \
-    PKG_CONFIG_PATH=$SYSROOT/usr/lib/$HOST/pkgconfig \
+    PKG_CONFIG_PATH=$SYSROOT/usr/lib/$HOST/pkgconfig:$SYSROOT/usr/lib/pkgconfig \
     OS="linux" \
     ARCH="arm7" \
     GOOS="linux" \

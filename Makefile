@@ -23,6 +23,7 @@ BUILD_OS_FLAG 		?= -X player/build.os=$(if $(call check_defined, GOOS),$(GOOS),$
 .PHONY: build
 
 build:
+	GODEBUG=cgocheck=0 \
 	GOOS=$(GOOS) \
 	GOARCH=$(GOARCH) \
 	GOARM=$(GOARM) \

@@ -1,0 +1,2 @@
+deb http://apt.mopidy.com/ jessie main contrib non-free
+deb-src http://apt.mopidy.com/ jessie main contrib non-free
