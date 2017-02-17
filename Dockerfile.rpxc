@@ -11,13 +11,13 @@ RUN /bin/sh -c '\
 COPY mopidy.apt.sources.list /rpxc/sysroot/etc/apt/sources.list.d/mopidy.sources.list
 COPY mopidy.gpg /rpxc/sysroot/etc/apt/mopidy.gpg
 RUN rpdo apt-key add /etc/apt/mopidy.gpg
-RUN install-raspbian --update libpulse-dev libspotify-dev
+
+RUN install-raspbian --update portaudio19-dev libspotify-dev
 
 # ENVs
 ENV CC=arm-linux-gnueabihf-gcc \
+    ARCH="armv7l" \
     PKG_CONFIG_PATH=$SYSROOT/usr/lib/$HOST/pkgconfig:$SYSROOT/usr/lib/pkgconfig \
-    OS="linux" \
-    ARCH="arm7" \
     GOOS="linux" \
     GOARCH="arm" \
     GOPATH=/go \
