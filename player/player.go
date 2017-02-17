@@ -5,9 +5,8 @@ import (
 	"io"
 	"sync"
 
+	"player/audio"
 	"player/logger"
-
-	pulse "github.com/mesilliac/pulse-simple"
 )
 
 var player *Player // Global Player
@@ -22,11 +21,7 @@ var (
 
 // Package initalisation
 func init() {
-	var err error
-	player, err = New()
-	if err != nil {
-		logger.WithError(err).Fatal("failed to initialise player")
-	}
+	player = New()
 }
 
 // All streamers must implement this interface
@@ -72,7 +67,6 @@ type Player struct {
 	// Exported Fields
 	Providers Providers // Service Providers (google etc)
 	// Unexported Fields
-	audio     *pulse.Stream // Audio Stream
 	pauseLock *sync.Mutex
 	playing   bool
 	paused    bool
@@ -89,10 +83,6 @@ func (p *Player) Close() error {
 	logger.Debug("close player")
 	defer logger.Info("closed player")
 	close(p.closeC) // Close the close channel
-	if p.stream != nil {
-		p.audio.Drain()
-		p.audio.Free()
-	}
 	p.playWg.Wait() // Wait for play routines to exit
 	return nil
 }
@@ -100,10 +90,8 @@ func (p *Player) Close() error {
 // Pause the player
 func Pause() bool { return player.Pause() }
 func (p *Player) Pause() bool {
-	p.pauseLock.Lock()
-	defer p.pauseLock.Unlock()
 	if !p.paused && p.playing {
-		p.paused = true
+		logger.Debug("player not paused and playing, resume")
 		p.pauseC <- true
 		return true
 	}
@@ -113,11 +101,20 @@ func (p *Player) Pause() bool {
 // Resume the player
 func Resume() bool { return player.Resume() }
 func (p *Player) Resume() bool {
-	p.pauseLock.Lock()
-	defer p.pauseLock.Unlock()
 	if p.paused && p.playing {
-		p.paused = false
+		logger.Debug("player paused and playing, resume")
 		p.resumeC <- true
+		return true
+	}
+	return false
+}
+
+// Stops playing the current playing track if playing
+func Stop() bool { return player.Stop() }
+func (p *Player) Stop() bool {
+	if p.playing {
+		p.stopC <- true
+		p.playWg.Wait() // Wait for play routines to exit before returning
 		return true
 	}
 	return false
@@ -133,17 +130,6 @@ func (p *Player) IsPaused() bool {
 func IsPlaying() bool { return player.IsPlaying() }
 func (p *Player) IsPlaying() bool {
 	return p.playing
-}
-
-// Stops playing the current playing track if playing
-func Stop() bool { return player.Stop() }
-func (p *Player) Stop() bool {
-	if p.playing {
-		p.stopC <- true
-		p.playWg.Wait() // Wait for play routines to exit before returning
-		return true
-	}
-	return false
 }
 
 // Play a track from a service
@@ -172,77 +158,63 @@ func (p *Player) Play(provider, id string) error {
 
 // Plays a track, handling pause / resume / stop events
 func (p *Player) play(stream io.ReadCloser) error {
-	logger.Debug("playing stream")
-	defer logger.Debug("stopped playing stream")
+	logger.Debug("start playback")
+	defer logger.Debug("exit playback")
 	// Close orchestration
 	p.playWg.Add(1)
 	defer p.playWg.Done()
 	// Set state
 	p.playing = true
-	p.paused = false
-	defer func(p *Player) { p.playing = false }(p)
-	defer func(p *Player) { p.paused = false }(p)
-	// Close the stream
-	defer stream.Close()
-	for { // Stream the file
-		if err := p.stream(stream); err != nil {
-			switch err {
-			case ErrPause: // If paused, wait for resume or close
-				select {
-				case <-p.resumeC:
-					continue
-				case <-p.stopC:
-					return nil
-				case <-p.closeC:
-					return nil
-				}
-			case io.ErrShortBuffer:
-				continue // Wait for buffer to fill
-			case io.EOF, ErrStop, ErrClose:
-				return nil // We are done :)
-			}
-		}
+	defer func(p *Player) { p.playing = false }(p) // Reset player playing statr
+	defer func(p *Player) { p.paused = false }(p)  // Reset player pause state
+	defer stream.Close()                           // Close the stream reader
+	// Start streaming
+	a, err := audio.New()
+	if err != nil {
+		return err
 	}
-}
-
-// Stream routine, takes a reader
-func (p *Player) stream(r io.Reader) error {
-	data := make([]byte, 1024*8)
+	defer a.Close()
+	go a.Stream(stream)
 	for {
 		select {
+		case err := <-a.Error():
+			// We got an error streaming audio, return
+			logger.WithError(err).Error("error streaming audio")
+			return err
+		case <-a.Done():
+			// Completed the audio stream
+			logger.Debug("stream complete")
+			return nil
 		case <-p.pauseC:
-			return ErrPause
-		case <-p.closeC:
-			return ErrClose
+			logger.Debug("pause player")
+			p.paused = true
+			a.Stop() // Stop the audio stream when we get a pause
+		case <-p.resumeC:
+			logger.Debug("resume player")
+			p.paused = false
+			a.Resume() // Resume the audio stream when pause stops
 		case <-p.stopC:
-			return ErrStop
-		default:
-			if _, err := r.Read(data); err != nil {
-				return err
-			}
-			if _, err := p.audio.Write(data); err != nil {
-				return err
-			}
+			// Player told to stop, return
+			logger.Debug("stop player")
+			return nil
+		case <-p.closeC:
+			// Closing
+			logger.Debug("close player")
+			return nil
 		}
 	}
 }
 
 // Consturcts a new Player with the given steamers
-func New() (*Player, error) {
-	spec := pulse.SampleSpec{pulse.SAMPLE_S16LE, 44100, 2}
-	audio, err := pulse.Playback("sfm", "sfm", &spec)
-	if err != nil {
-		return nil, err
-	}
+func New() *Player {
 	player := &Player{
 		Providers: make(Providers),
-		audio:     audio,
 		pauseLock: &sync.Mutex{},
-		stopC:     make(chan bool),
-		pauseC:    make(chan bool),
-		resumeC:   make(chan bool),
+		stopC:     make(chan bool, 1),
+		pauseC:    make(chan bool, 1),
+		resumeC:   make(chan bool, 1),
 		playWg:    &sync.WaitGroup{},
-		closeC:    make(chan bool),
+		closeC:    make(chan bool, 1),
 	}
-	return player, nil
+	return player
 }

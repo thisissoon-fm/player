@@ -67,6 +67,8 @@ var playerCmd = &cobra.Command{
 		player.AddProvider(sp)
 		// Close the player on exit
 		defer player.Close()
+		// Setup - Ready to roll
+		logger.Debug("application setup complete")
 		// Run until os signal
 		sig := <-run.UntilQuit()
 		logger.WithField("sig", sig).Debug("received os signal")
