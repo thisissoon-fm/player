@@ -3,8 +3,8 @@
 # Building an ARM7 Binary for Raspberry Pi requires docker
 #
 
-OS 					?= $(shell echo `uname -s` | awk '{print tolower($0)}')
-ARCH 				?= $(shell echo `uname -m` | awk '{print tolower($0)}')
+OS 					?= $(shell echo `uname -s` | tr '[:upper:]' '[:lower:]')
+ARCH 				?= $(shell echo `uname -m` | tr '[:upper:]' '[:lower:]')
 CGO_ENABLED 		?= 1
 CGO_CFLAGS 			?= ""
 CGO_LDFLAGS 		?= ""
@@ -17,7 +17,7 @@ BUILD_TIME 			?= $(shell date +%s)
 BUILD_VERSION 		?= $(shell git rev-parse --short HEAD)
 BUILD_TIME_FLAG 	?= -X player/build.timestamp=${BUILD_TIME}
 BUILD_VERSION_FLAG 	?= -X player/build.version=${BUILD_VERSION}
-BUILD_ARCH_FLAG 	?= -X player/build.arch=$(if $(call check_defined, GOARCH),$(GOARCH),$(ARCH))
+BUILD_ARCH_FLAG 	?= -X player/build.arch=$(if $(call check_defined, ARCH),$(ARCH),$(GOARCH))
 BUILD_OS_FLAG 		?= -X player/build.os=$(if $(call check_defined, GOOS),$(GOOS),$(OS))
 
 .PHONY: build
