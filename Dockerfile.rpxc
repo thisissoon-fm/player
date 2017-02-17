@@ -1,11 +1,12 @@
 FROM sdthirlwall/raspberry-pi-cross-compiler
 
-# Install Golang 1.7
+# Install Golang 1.8
 RUN /bin/sh -c '\
-        echo "deb http://ftp.debian.org/debian jessie-backports main" \
-            >> /etc/apt/sources.list \
-        && apt-get update \
-        && apt-get -t jessie-backports install golang -y'
+        cd /tmp \
+        && curl -O https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz \
+        && tar xfz go1.8.linux-amd64.tar.gz \
+        && mv go /usr/local \
+        && rm /tmp/go1.8.linux-amd64.tar.gz'
 
 # Install Raspbian Dependencies
 COPY mopidy.apt.sources.list /rpxc/sysroot/etc/apt/sources.list.d/mopidy.sources.list
@@ -14,10 +15,13 @@ RUN rpdo apt-key add /etc/apt/mopidy.gpg
 
 RUN install-raspbian --update portaudio19-dev libspotify-dev
 
-# ENVs
-ENV CC=arm-linux-gnueabihf-gcc \
+RUN install-debian pkg-config
+
+# ENV
+ENV PATH=$PATH:/usr/local/go/bin \
+    CC=arm-linux-gnueabihf-gcc \
     ARCH="armv7l" \
-    PKG_CONFIG_PATH=$SYSROOT/usr/lib/$HOST/pkgconfig:$SYSROOT/usr/lib/pkgconfig \
+    PKG_CONFIG_PATH=$SYSROOT/usr/lib/$HOST/pkgconfig:$SYSROOT/usr/lib/pkgconfig:/rpxc/sysroot/usr/lib/pkgconfig \
     GOOS="linux" \
     GOARCH="arm" \
     GOPATH=/go \
