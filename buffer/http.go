@@ -31,7 +31,7 @@ func (h *HTTP) Read(b []byte) (int, error) {
 		return 0, io.ErrShortBuffer
 	}
 	// Wait for buffer to fill
-	if h.buffered < 64*1024 {
+	if h.buffered < 16*1024 {
 		return 0, io.ErrShortBuffer
 	}
 	// If we are at the end of the buffer return EOF
