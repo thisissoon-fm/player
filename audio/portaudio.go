@@ -116,9 +116,6 @@ func New() (*PortAudio, error) {
 		return nil, err
 	}
 	device := host.DefaultOutputDevice
-	logger.WithFields(logger.F{
-		"device": device,
-	}).Debug("portaudio output device")
 	params := portaudio.HighLatencyParameters(nil, device)
 	params.Output.Channels = CHANNELS
 	params.SampleRate = float64(SAMPLE_RATE)
