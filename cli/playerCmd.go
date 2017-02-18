@@ -36,17 +36,6 @@ var playerCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		defer logger.Info("exit")
-		// Event Hub
-		go event.ProcessEvents()
-		defer event.Close()
-		// Websocket Client
-		websocket := web.New(web.NewConfig())
-		go websocket.Connect()
-		defer websocket.Close()
-		// Start a unix socket server for IPC
-		unixsock := unix.NewServer(unix.NewConfig())
-		go unixsock.Listen()
-		defer unixsock.Close()
 		// Google Music Provider
 		gmp, err := googlemusic.New(googlemusic.NewConfig())
 		if err != nil {
@@ -67,6 +56,17 @@ var playerCmd = &cobra.Command{
 		player.AddProvider(sp)
 		// Close the player on exit
 		defer player.Close()
+		// Event Hub
+		go event.ProcessEvents()
+		defer event.Close()
+		// Websocket Client
+		websocket := web.New(web.NewConfig())
+		go websocket.Connect()
+		defer websocket.Close()
+		// Start a unix socket server for IPC
+		unixsock := unix.NewServer(unix.NewConfig())
+		go unixsock.Listen()
+		defer unixsock.Close()
 		// Setup - Ready to roll
 		logger.Debug("application setup complete")
 		// Run until os signal

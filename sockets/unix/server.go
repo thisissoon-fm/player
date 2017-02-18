@@ -45,7 +45,13 @@ func (s *Server) Listen() error {
 	defer logger.Debug("exit socket server listen")
 	s.wg.Add(1)
 	defer s.wg.Done()
-	l, err := net.Listen("unix", s.Config.Address())
+	addr := s.Config.Address()
+	if _, err := os.Stat(addr); err == nil {
+		if err := os.Remove(addr); err != nil {
+			return err
+		}
+	}
+	l, err := net.Listen("unix", addr)
 	if err != nil {
 		return err
 	}
