@@ -33,3 +33,12 @@ build:
 	go build -v \
 		-ldflags "$(BUILD_TIME_FLAG) $(BUILD_VERSION_FLAG) $(BUILD_ARCH_FLAG) $(BUILD_OS_FLAG)" \
 		-o $(GOOUT)
+
+arm7l:
+	docker run \
+		--rm \
+		-it \
+		-v `pwd`:/go/src/player \
+		-e GOARM=7 \
+		-e BUILD_TIME=$(BUILD_TIME) \
+		registry.soon.build/sfm/player:rpxc
