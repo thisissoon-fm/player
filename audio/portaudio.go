@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"io"
 	"sync"
+	"time"
 
 	"player/logger"
 
@@ -116,7 +117,9 @@ func New() (*PortAudio, error) {
 		return nil, err
 	}
 	device := host.DefaultOutputDevice
+	logger.WithField("name", device.Name).Debug("port audio device")
 	params := portaudio.HighLatencyParameters(nil, device)
+	params.Output.Latency = 30 * time.Microsecond
 	params.Output.Channels = CHANNELS
 	params.SampleRate = float64(SAMPLE_RATE)
 	params.FramesPerBuffer = FRAMES_PER_BUFFER
