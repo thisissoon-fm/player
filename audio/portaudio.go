@@ -14,8 +14,8 @@ import (
 
 // Port audio streamer
 type PortAudio struct {
-	// Portaudio
-	params portaudio.StreamParameters
+	// Audio Stream
+	stream *Stream
 	// Orchestration
 	wg      *sync.WaitGroup
 	resumeC chan bool
@@ -23,6 +23,9 @@ type PortAudio struct {
 	stopC   chan bool
 	doneC   chan bool
 	closeC  chan bool
+
+	inputC chan []int16
+	over   []int16
 }
 
 // Stop the stream
@@ -49,20 +52,6 @@ func (pa *PortAudio) Error() <-chan error {
 func (pa *PortAudio) Stream(r io.Reader) {
 	pa.wg.Add(1)
 	defer pa.wg.Done()
-	frames := make([]int16, FRAMES_PER_BUFFER)
-	logger.Debug("open portaudio stream")
-	stream, err := portaudio.OpenStream(pa.params, &frames)
-	if err != nil {
-		pa.errorC <- err
-		return
-	}
-	defer stream.Close()
-	logger.Debug("start portstart stream")
-	if err := stream.Start(); err != nil {
-		pa.errorC <- err
-		return
-	}
-	defer stream.Stop()
 	for {
 		select {
 		case <-pa.closeC:
@@ -81,6 +70,7 @@ func (pa *PortAudio) Stream(r io.Reader) {
 				continue
 			}
 		default:
+			frames := make([]int16, FRAMES_PER_BUFFER)
 			if err := binary.Read(r, binary.LittleEndian, &frames); err != nil {
 				switch err {
 				case io.EOF, io.ErrUnexpectedEOF:
@@ -93,9 +83,7 @@ func (pa *PortAudio) Stream(r io.Reader) {
 					return
 				}
 			}
-			if err := stream.Write(); err != nil {
-				logger.WithError(err).Warn("stream write error")
-			}
+			pa.stream.Push(frames)
 		}
 	}
 }
@@ -104,6 +92,7 @@ func (pa *PortAudio) Stream(r io.Reader) {
 func (pa *PortAudio) Close() error {
 	close(pa.closeC)
 	pa.wg.Wait()
+	pa.stream.Close()
 	portaudio.Terminate()
 	return nil
 }
@@ -111,17 +100,20 @@ func (pa *PortAudio) Close() error {
 // Construct a new port audio streamer
 func New() (*PortAudio, error) {
 	portaudio.Initialize()
-	host, err := portaudio.DefaultHostApi()
+	s := NewStream()
+	stream, err := portaudio.OpenDefaultStream(
+		0,
+		CHANNELS,
+		float64(SAMPLE_RATE),
+		FRAMES_PER_BUFFER,
+		s.Fetch)
+	s.stream = stream
 	if err != nil {
 		return nil, err
 	}
-	device := host.DefaultOutputDevice
-	params := portaudio.HighLatencyParameters(nil, device)
-	params.Output.Channels = CHANNELS
-	params.SampleRate = float64(SAMPLE_RATE)
-	params.FramesPerBuffer = FRAMES_PER_BUFFER
+	s.stream.Start()
 	pa := &PortAudio{
-		params:  params,
+		stream:  s,
 		resumeC: make(chan bool, 1),
 		stopC:   make(chan bool, 1),
 		errorC:  make(chan error, 1),
@@ -130,4 +122,59 @@ func New() (*PortAudio, error) {
 		wg:      &sync.WaitGroup{},
 	}
 	return pa, nil
+}
+
+type Stream struct {
+	stream *portaudio.Stream
+	inputC chan []int16
+	over   []int16
+}
+
+func (s *Stream) Push(samples []int16) {
+	s.inputC <- samples
+}
+
+func (s *Stream) Fetch(out []int16) {
+	// Write previously saved samples.
+	i := copy(out, s.over)
+	s.over = s.over[i:]
+	for i < len(out) {
+		select {
+		case d := <-s.inputC:
+			n := copy(out[i:], d)
+			if n < len(d) {
+				// Save anything we didn't need this time.
+				s.over = d[n:]
+			}
+			i += n
+		default:
+			z := make([]int16, len(out)-i)
+			copy(out[i:], z)
+			return
+		}
+	}
+}
+
+func (s *Stream) Start() error {
+	return s.stream.Start()
+}
+
+func (s *Stream) Stop() error {
+	return s.stream.Stop()
+}
+
+func (s *Stream) Close() error {
+	if err := s.stream.Stop(); err != nil {
+		return err
+	}
+	if err := s.stream.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func NewStream() *Stream {
+	return &Stream{
+		inputC: make(chan []int16, 8),
+	}
 }
