@@ -3,134 +3,154 @@
 package audio
 
 import (
-	"encoding/binary"
-	"io"
+	"errors"
 	"sync"
-	"time"
 
 	"player/logger"
 
 	"github.com/gordonklaus/portaudio"
 )
 
-// Port audio streamer
-type PortAudio struct {
-	// Portaudio
-	params portaudio.StreamParameters
-	// Orchestration
-	wg      *sync.WaitGroup
-	resumeC chan bool
-	errorC  chan error
-	stopC   chan bool
-	doneC   chan bool
+// No output setup error
+var ErrNoOutput = errors.New("no output stream setup")
+
+// Audio output stream handler
+var output *Output
+
+// Initialises the audio device for streaming
+func Open() error {
+	logger.Debug("initialize portaudio")
+	// Start portaudio
+	if err := portaudio.Initialize(); err != nil {
+		return err
+	}
+	// Get host api
+	host, err := portaudio.DefaultHostApi()
+	if err != nil {
+		return err
+	}
+	device := host.DefaultOutputDevice
+	logger.WithFields(logger.F{
+		"name":       device.Name,
+		"sampleRate": device.DefaultSampleRate,
+	}).Debug("using portaudio device")
+	// Setup output writer
+	output = NewOutput(device, INPUT_BUFFER_SIZE)
+	return output.Start() // Start the outout writter
+}
+
+// Closes the audio output and terminates portaudio
+func Close() error {
+	logger.Debug("close audio")
+	defer logger.Debug("closed audio")
+	if output != nil {
+		if err := output.Close(); err != nil {
+			return err
+		}
+	}
+	return portaudio.Terminate()
+}
+
+// Returs the current audio output writer
+func Get() (*Output, error) {
+	if output == nil {
+		return nil, ErrNoOutput
+	}
+	return output, nil
+}
+
+// Output handles writting to audio stream
+type Output struct {
+	// Portaudio Stream
+	device *portaudio.DeviceInfo
+	stream *portaudio.Stream
+	// Input bytes from audio source
+	inputC   chan []int16
+	leftover []int16
+	// Close orchestration
+	closeWg *sync.WaitGroup
 	closeC  chan bool
 }
 
-// Stop the stream
-func (pa *PortAudio) Stop() {
-	pa.stopC <- true
-}
-
-// Resume the stream
-func (pa *PortAudio) Resume() {
-	pa.resumeC <- true
-}
-
-// Returns a channel to watch for the stream finishing
-func (pa *PortAudio) Done() <-chan bool {
-	return (<-chan bool)(pa.doneC)
-}
-
-// Errors in the stream will be placed here
-func (pa *PortAudio) Error() <-chan error {
-	return (<-chan error)(pa.errorC)
-}
-
-// Streams an io.Reader to the port audio device stream
-func (pa *PortAudio) Stream(r io.Reader) {
-	pa.wg.Add(1)
-	defer pa.wg.Done()
-	frames := make([]int16, FRAMES_PER_BUFFER)
-	logger.Debug("open portaudio stream")
-	stream, err := portaudio.OpenStream(pa.params, &frames)
-	if err != nil {
-		pa.errorC <- err
-		return
+// Opens and starts a portaudio stream
+func (output *Output) Start() error {
+	if output.stream == nil {
+		logger.Debug("setup portaudio output stream")
+		// Stream parameters
+		params := portaudio.HighLatencyParameters(nil, output.device)
+		params.Output.Channels = CHANNELS
+		params.SampleRate = float64(SAMPLE_RATE)
+		params.FramesPerBuffer = FRAMES_PER_BUFFER
+		// Setup Stream
+		stream, err := portaudio.OpenStream(params, output.write)
+		if err != nil {
+			return err
+		}
+		// Start the portaudio stream
+		if err := stream.Start(); err != nil {
+			if err := stream.Close(); err != nil {
+				return err
+			}
+			return err
+		}
+		output.stream = stream
+		return nil
 	}
-	defer stream.Close()
-	logger.Debug("start portstart stream")
-	if err := stream.Start(); err != nil {
-		pa.errorC <- err
-		return
-	}
-	defer stream.Stop()
-	for {
+	return nil
+}
+
+// Writes output to the audio device
+func (output *Output) write(out []int16) {
+	// Write previously saved samples.
+	i := copy(out, output.leftover)
+	output.leftover = output.leftover[i:]
+	for i < len(out) {
 		select {
-		case <-pa.closeC:
-			logger.Debug("close stream")
-			pa.doneC <- true
-			return
-		case <-pa.stopC:
-			logger.Debug("stop stream")
-			select {
-			case <-pa.closeC:
-				logger.Debug("close stream")
-				pa.doneC <- true
-				return
-			case <-pa.resumeC:
-				logger.Debug("resume stream")
-				continue
+		case s := <-output.inputC:
+			n := copy(out[i:], s)
+			if n < len(s) {
+				// Save anything we didn't need this time.
+				output.leftover = s[n:]
 			}
+			i += n
 		default:
-			if err := binary.Read(r, binary.LittleEndian, &frames); err != nil {
-				switch err {
-				case io.EOF, io.ErrUnexpectedEOF:
-					pa.doneC <- true
-					return
-				case io.ErrShortBuffer:
-					continue
-				default:
-					pa.errorC <- err
-					return
-				}
-			}
-			if err := stream.Write(); err != nil {
-				logger.WithError(err).Warn("stream write error")
-			}
+			z := make([]int16, len(out)-i)
+			copy(out[i:], z)
+			return
 		}
 	}
 }
 
-// Close the port audio stream
-func (pa *PortAudio) Close() error {
-	close(pa.closeC)
-	pa.wg.Wait()
-	portaudio.Terminate()
+// Push data onto our input channel queue
+func (output *Output) Write(data []int16) (int, error) {
+	output.inputC <- data
+	return len(data), nil
+}
+
+// Stops the output stream writter and stops/closes the
+// portaudio stream
+func (output *Output) Close() error {
+	logger.Debug("close audio output")
+	defer logger.Debug("closed audio output")
+	close(output.closeC)
+	output.closeWg.Wait() // Wait for the writer to exit
+	if output.stream != nil {
+		if err := output.stream.Stop(); err != nil {
+			return err
+		}
+		if err := output.stream.Close(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// Construct a new port audio streamer
-func New() (*PortAudio, error) {
-	portaudio.Initialize()
-	host, err := portaudio.DefaultHostApi()
-	if err != nil {
-		return nil, err
+// Construct a new output handler
+func NewOutput(device *portaudio.DeviceInfo, bufferSize int) *Output {
+	return &Output{
+		device:  device,
+		inputC:  make(chan []int16, bufferSize),
+		closeWg: &sync.WaitGroup{},
+		closeC:  make(chan bool),
 	}
-	device := host.DefaultOutputDevice
-	logger.WithField("name", device.Name).Debug("port audio device")
-	params := portaudio.HighLatencyParameters(nil, device)
-	params.Output.Latency = 30 * time.Microsecond
-	params.Output.Channels = CHANNELS
-	params.SampleRate = float64(SAMPLE_RATE)
-	params.FramesPerBuffer = FRAMES_PER_BUFFER
-	pa := &PortAudio{
-		params:  params,
-		resumeC: make(chan bool, 1),
-		stopC:   make(chan bool, 1),
-		errorC:  make(chan error, 1),
-		closeC:  make(chan bool, 1),
-		doneC:   make(chan bool, 1),
-		wg:      &sync.WaitGroup{},
-	}
-	return pa, nil
 }

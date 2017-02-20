@@ -1,18 +1,12 @@
 package audio
 
-import "io"
-
 const (
 	CHANNELS          = 2
 	SAMPLE_RATE       = 44100
-	FRAMES_PER_BUFFER = 8 * 1024
+	FRAMES_PER_BUFFER = 1048
+	INPUT_BUFFER_SIZE = 1
 )
 
-type Streamer interface {
-	Stream(io.Reader)
-	Done() <-chan bool
-	Error() <-chan error
-	Stop()
-	Resume()
-	Close() error
+type Writer interface {
+	Write([]int16) (int, error)
 }

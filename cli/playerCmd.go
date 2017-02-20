@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 
+	"player/audio"
 	"player/config"
 	"player/event"
 	"player/logger"
@@ -36,6 +37,12 @@ var playerCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		defer logger.Info("exit")
+		// Setup Audio
+		if err := audio.Open(); err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer audio.Close()
 		// Google Music Provider
 		gmp, err := googlemusic.New(googlemusic.NewConfig())
 		if err != nil {

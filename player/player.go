@@ -168,41 +168,33 @@ func (p *Player) play(stream io.ReadCloser) error {
 	defer func(p *Player) { p.playing = false }(p) // Reset player playing statr
 	defer func(p *Player) { p.paused = false }(p)  // Reset player pause state
 	defer stream.Close()                           // Close the stream reader
-	// Start streaming
-	a, err := audio.New()
+	// Get audio output
+	output, err := audio.Get()
 	if err != nil {
 		return err
 	}
-	defer a.Close()
-	go a.Stream(stream)
+	// Load cassette
+	cassette := audio.NewCassette(stream, output)
+	go cassette.Play() // Start playing the cassette
+	defer cassette.Eject()
 	for {
 		select {
-		case err := <-a.Error():
-			// We got an error streaming audio, return
-			logger.WithError(err).Error("error streaming audio")
-			return err
-		case <-a.Done():
-			// Completed the audio stream
-			logger.Debug("stream complete")
+		case <-cassette.End():
 			return nil
 		case <-p.pauseC:
-			logger.Debug("pause player")
 			p.paused = true
-			a.Stop() // Stop the audio stream when we get a pause
+			cassette.Stop()
 		case <-p.resumeC:
-			logger.Debug("resume player")
 			p.paused = false
-			a.Resume() // Resume the audio stream when pause stops
+			cassette.Resume()
 		case <-p.stopC:
-			// Player told to stop, return
-			logger.Debug("stop player")
 			return nil
 		case <-p.closeC:
-			// Closing
 			logger.Debug("close player")
 			return nil
 		}
 	}
+	return nil
 }
 
 // Consturcts a new Player with the given steamers
