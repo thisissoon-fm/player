@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"player/audio"
 	"player/config"
@@ -74,10 +75,23 @@ var playerCmd = &cobra.Command{
 		unixsock := unix.NewServer(unix.NewConfig())
 		go unixsock.Listen()
 		defer unixsock.Close()
+		// Finally send the player.ready event - block until connected
+		for !websocket.Connected() {
+			<-time.After(time.Second)
+		}
+		if err := event.PlayerReady(); err != nil {
+			fmt.Println(err)
+			return
+		}
 		// Setup - Ready to roll
 		logger.Debug("application setup complete")
 		// Run until os signal
 		sig := <-run.UntilQuit()
+		// Offline Event
+		if err := event.Offline(); err != nil {
+			fmt.Println(err)
+			return
+		}
 		logger.WithField("sig", sig).Debug("received os signal")
 	},
 }

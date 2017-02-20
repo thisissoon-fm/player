@@ -6,17 +6,17 @@ import (
 )
 
 const (
-	PlayerReady   string = "player:ready"
-	PlayerOffline string = "player:offline"
-	PlayEvent     string = "player:play"
-	PlayingEvent  string = "player:playing"
-	StopEvent     string = "player:stop"
-	StoppedEvent  string = "player:stopped"
-	PauseEvent    string = "player:pause"
-	PausedEvent   string = "player:paused"
-	ResumeEvent   string = "player:resume"
-	ResumedEvent  string = "player:resumed"
-	ErrorEvent    string = "player:error"
+	PlayerReadyEvent   string = "player:ready"
+	PlayerOfflineEvent string = "player:offline"
+	PlayEvent          string = "player:play"
+	PlayingEvent       string = "player:playing"
+	StopEvent          string = "player:stop"
+	StoppedEvent       string = "player:stopped"
+	PauseEvent         string = "player:pause"
+	PausedEvent        string = "player:paused"
+	ResumeEvent        string = "player:resume"
+	ResumedEvent       string = "player:resumed"
+	ErrorEvent         string = "player:error"
 )
 
 type Reader interface {

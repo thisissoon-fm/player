@@ -157,6 +157,32 @@ func (hub *Hub) Broadcast(event Event) error {
 	return nil
 }
 
+// Ready is fired when the player is ready to start playing tracks
+func PlayerReady() error { return hub.PlayerReady() }
+func (h *Hub) PlayerReady() error {
+	event := Event{
+		Type:    PlayerReadyEvent,
+		Created: time.Now().UTC(),
+	}
+	if err := hub.Broadcast(event); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Ready is fired when the player is ready to start playing tracks
+func Offline() error { return hub.Offline() }
+func (h *Hub) Offline() error {
+	event := Event{
+		Type:    PlayerOfflineEvent,
+		Created: time.Now().UTC(),
+	}
+	if err := hub.Broadcast(event); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Close the event hub, this will prevent any further events
 // from being processed
 func Close() error { return hub.Close() }

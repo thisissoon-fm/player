@@ -149,6 +149,11 @@ func (c *Client) Connect() {
 	}
 }
 
+// Connected state
+func (c *Client) Connected() bool {
+	return c.connected
+}
+
 // Read messages from the websocket server
 func (c *Client) Read() ([]byte, error) {
 	select {
