@@ -50,7 +50,7 @@ var resumeCmd = &cobra.Command{
 					fmt.Println("error reading event:", err)
 				}
 				switch e.Type {
-				case event.ResumedEvent:
+				case event.PlayingEvent:
 					fmt.Println("Playback resumed")
 					return
 				case event.ErrorEvent:

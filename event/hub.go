@@ -104,8 +104,38 @@ func (hub *Hub) ProcessEvents() {
 		select {
 		case <-hub.closeC:
 			return
-		case event := <-hub.eventsC:
-			go hub.handleEvent(event)
+		case <-player.Playing(): // The player is playing
+			go func() {
+				hub.closeWg.Add(1)
+				if err := hub.playingTrack(); err != nil {
+					logger.WithError(err).Error("error handling playing event")
+				}
+				hub.closeWg.Done()
+			}()
+		case <-player.Stopped(): // The player has stopped
+			go func() {
+				hub.closeWg.Add(1)
+				if err := hub.stoppedPlayer(); err != nil {
+					logger.WithError(err).Error("error handling stopped event")
+				}
+				hub.closeWg.Done()
+			}()
+		case <-player.Paused(): // The player has paused
+			go func() {
+				hub.closeWg.Add(1)
+				if err := hub.pausedPlayer(); err != nil {
+					logger.WithError(err).Error("error handling paused event")
+				}
+				hub.closeWg.Done()
+			}()
+		case event := <-hub.eventsC: // Client events
+			go func() {
+				hub.closeWg.Add(1)
+				if err := hub.handleEvent(event); err != nil {
+					logger.WithError(err).Error("error handling event")
+				}
+				hub.closeWg.Done()
+			}()
 		}
 	}
 }
@@ -178,48 +208,21 @@ func (hub *Hub) read(client Client) error {
 // actions to all attachec clients, other only reply to the client
 // that origionated the event, this is the case for error responses
 // so errors can be surfaced back to the clients
-func (hub *Hub) handleEvent(ce ClientEvent) {
+func (hub *Hub) handleEvent(ce ClientEvent) error {
 	logger.Debug("handle event")
-	hub.closeWg.Add(1)
-	defer hub.closeWg.Done()
 	switch ce.Event.Type {
 	case PauseEvent:
-		if err := hub.pausePlayer(ce); err != nil {
-			logger.WithError(err).Error("error pausing player")
-		}
-	case PausedEvent:
-		if err := hub.pausedPlayer(ce); err != nil {
-			logger.WithError(err).Error("error sending paused event")
-		}
+		return hub.pausePlayer(ce)
 	case ResumeEvent:
-		if err := hub.resumePlayer(ce); err != nil {
-			logger.WithError(err).Error("error resuming player")
-		}
-	case ResumedEvent:
-		if err := hub.resumedPlayer(ce); err != nil {
-			logger.WithError(err).Error("error sending resumed event")
-		}
+		return hub.resumePlayer(ce)
 	case PlayEvent:
-		if err := hub.playTrack(ce); err != nil {
-			logger.WithError(err).Error("error playing track")
-		}
-	case PlayingEvent:
-		if err := hub.playingTrack(ce); err != nil {
-			logger.WithError(err).Error("error sending playing event")
-		}
+		return hub.playTrack(ce)
 	case StopEvent:
-		if err := hub.stopTrack(ce); err != nil {
-			logger.WithError(err).Error("error stopping player")
-		}
-	case StoppedEvent:
-		if err := hub.stoppedPlayer(ce); err != nil {
-			logger.WithError(err).Error("error sending stopped event")
-		}
+		return hub.stopTrack(ce)
 	case ErrorEvent:
-		if err := hub.eventError(ce); err != nil {
-			logger.WithError(err).Error("unable to write error to client")
-		}
+		return hub.eventError(ce)
 	}
+	return nil
 }
 
 // Pause event pauses the player, if the player is playing and not paused
@@ -227,17 +230,7 @@ func (hub *Hub) handleEvent(ce ClientEvent) {
 // false if the player was not paused
 func (hub *Hub) pausePlayer(ce ClientEvent) error {
 	logger.Debug("handle pause event")
-	if player.Pause() {
-		// The player was paused place a new paused event
-		// onto the events channel
-		hub.eventsC <- ClientEvent{
-			Client: ce.Client,
-			Event: Event{
-				Type:    PausedEvent,
-				Created: time.Now().UTC(),
-			},
-		}
-	} else {
+	if !player.Pause() {
 		// If the player is not playing or is already paused
 		// error back to the origional client
 		payload, err := json.Marshal(&ErrorPayload{
@@ -258,28 +251,15 @@ func (hub *Hub) pausePlayer(ce ClientEvent) error {
 	return nil
 }
 
-// Triggered by the pause handler on a successful pause, this needs
-// to be broadcast to all clients so UI's can update their state
-func (hub *Hub) pausedPlayer(ce ClientEvent) error {
+// Triggered by the player pause event
+func (hub *Hub) pausedPlayer() error {
 	logger.Debug("handle paused event")
-	if err := hub.Broadcast(ce.Event); err != nil {
-		payload, err := json.Marshal(&ErrorPayload{
-			Error: err.Error(),
-		})
-		if err != nil {
-			return err
-		}
-		body, err := json.Marshal(Event{
-			Type:    ErrorEvent,
-			Created: time.Now().UTC(),
-			Payload: json.RawMessage(payload),
-		})
-		if err != nil {
-			return err
-		}
-		if _, err := ce.Client.Write(body); err != nil {
-			return err
-		}
+	event := Event{
+		Type:    PausedEvent,
+		Created: time.Now().UTC(),
+	}
+	if err := hub.Broadcast(event); err != nil {
+		return err
 	}
 	return nil
 }
@@ -289,17 +269,7 @@ func (hub *Hub) pausedPlayer(ce ClientEvent) error {
 // false if the player was not resumed
 func (hub *Hub) resumePlayer(ce ClientEvent) error {
 	logger.Debug("handle resume event")
-	if player.Resume() {
-		// The player was resumed place a new resumed event
-		// onto the events channel
-		hub.eventsC <- ClientEvent{
-			Client: ce.Client,
-			Event: Event{
-				Type:    ResumedEvent,
-				Created: time.Now().UTC(),
-			},
-		}
-	} else {
+	if !player.Resume() {
 		// If the player is not playing or is not paused
 		// error back to the origional client
 		payload, err := json.Marshal(&ErrorPayload{
@@ -320,43 +290,16 @@ func (hub *Hub) resumePlayer(ce ClientEvent) error {
 	return nil
 }
 
-// Triggered by the resume handler on a successful resume, this needs
-// to be broadcast to all clients so UI's can update their state
-func (hub *Hub) resumedPlayer(ce ClientEvent) error {
-	logger.Debug("handle resumed event")
-	if err := hub.Broadcast(ce.Event); err != nil {
-		payload, err := json.Marshal(&ErrorPayload{
-			Error: err.Error(),
-		})
-		if err != nil {
-			return err
-		}
-		body, err := json.Marshal(Event{
-			Type:    ErrorEvent,
-			Created: time.Now().UTC(),
-			Payload: json.RawMessage(payload),
-		})
-		if err != nil {
-			return err
-		}
-		if _, err := ce.Client.Write(body); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // The play event triggers the player to play a track from a provider
 // This may error if the player is already playing a track, we cannpt
 // decode the event payload or there was an error retreiving the
-// player stream. On success a playing event will be published.
+// player stream.
 func (hub *Hub) playTrack(ce ClientEvent) error {
 	logger.Debug("handle play event")
 	payload := &PlayPayload{}
 	if err := json.Unmarshal(ce.Event.Payload, payload); err != nil {
 		return err
 	}
-	// player.Play is a blocking method
 	if err := player.Play(payload.ProviderID, payload.TrackID); err != nil {
 		payload, err := json.Marshal(&ErrorPayload{
 			Error: err.Error(),
@@ -375,42 +318,19 @@ func (hub *Hub) playTrack(ce ClientEvent) error {
 		if _, err := ce.Client.Write(body); err != nil {
 			return err
 		}
-	} else {
-		// The play is now playing, dispatch the playing event
-		hub.eventsC <- ClientEvent{
-			Client: ce.Client,
-			Event: Event{
-				Type:    PlayingEvent,
-				Created: time.Now().UTC(),
-				Payload: ce.Event.Payload, // We can just send the same payload back
-			},
-		}
 	}
 	return nil
 }
 
-// Triggered by the play event handler, this handler broadcasts a playing event
-// once the player starts playing a track
-func (hub *Hub) playingTrack(ce ClientEvent) error {
+// Triggered by the player playing event
+func (hub *Hub) playingTrack() error {
 	logger.Debug("handle playing event")
-	if err := hub.Broadcast(ce.Event); err != nil {
-		payload, err := json.Marshal(&ErrorPayload{
-			Error: err.Error(),
-		})
-		if err != nil {
-			return err
-		}
-		body, err := json.Marshal(&Event{
-			Type:    ErrorEvent,
-			Created: time.Now().UTC(),
-			Payload: json.RawMessage(payload),
-		})
-		if err != nil {
-			return err
-		}
-		if _, err := ce.Client.Write(body); err != nil {
-			return err
-		}
+	event := Event{
+		Type:    PlayingEvent,
+		Created: time.Now().UTC(),
+	}
+	if err := hub.Broadcast(event); err != nil {
+		return err
 	}
 	return nil
 }
@@ -420,18 +340,7 @@ func (hub *Hub) playingTrack(ce ClientEvent) error {
 // been triggered on the player, else it will return false
 func (hub *Hub) stopTrack(ce ClientEvent) error {
 	logger.Debug("handle stop event")
-	if player.Stop() {
-		// The player was stopped place a new stopped event
-		// onto the events channel
-		hub.eventsC <- ClientEvent{
-			Client: ce.Client,
-			Event: Event{
-				Type:    StoppedEvent,
-				Created: time.Now().UTC(),
-			},
-		}
-	} else {
-		// If the player is not playing origional client
+	if !player.Stop() {
 		payload, err := json.Marshal(&ErrorPayload{
 			Error: ErrStopping.Error(),
 		})
@@ -448,31 +357,17 @@ func (hub *Hub) stopTrack(ce ClientEvent) error {
 		}
 	}
 	return nil
-
 }
 
-// Triggered by the stop handler on a successful stop, this needs
-// to be broadcast to all clients so UI's can update their state
-func (hub *Hub) stoppedPlayer(ce ClientEvent) error {
-	logger.Debug("handle stopped event")
-	if err := hub.Broadcast(ce.Event); err != nil {
-		payload, err := json.Marshal(&ErrorPayload{
-			Error: err.Error(),
-		})
-		if err != nil {
-			return err
-		}
-		body, err := json.Marshal(&Event{
-			Type:    ErrorEvent,
-			Created: time.Now().UTC(),
-			Payload: json.RawMessage(payload),
-		})
-		if err != nil {
-			return err
-		}
-		if _, err := ce.Client.Write(body); err != nil {
-			return err
-		}
+// Triggered by a player stopped event
+func (hub *Hub) stoppedPlayer() error {
+	logger.Debug("handle player stopped event")
+	event := Event{
+		Type:    StoppedEvent,
+		Created: time.Now().UTC(),
+	}
+	if err := hub.Broadcast(event); err != nil {
+		return err
 	}
 	return nil
 }
