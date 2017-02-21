@@ -44,9 +44,9 @@ type Event struct {
 }
 
 type PlayPayload struct {
-	ProviderID string `json:"providerID"` // The provider ID name (googlemusic, soundcloud)
-	TrackID    string `json:"trackID"`    // The track id from the provider
-	PlaylistID string `json:"playlistID"` // The Playlist ID from the playlist service
+	ProviderName    string `json:"providerID"`      // The provider name (googlemusic, soundcloud)
+	ProviderTrackID string `json:"providerTrackID"` // The provider track id from the provider
+	PlaylistID      string `json:"playlistID"`      // The Playlist ID from the playlist service
 }
 
 type ErrorPayload struct {

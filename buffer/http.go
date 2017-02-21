@@ -21,6 +21,7 @@ type HTTP struct {
 	file     *os.File        // Buffer temporary file
 	buffer   buffer.BufferAt // Internal Buffer
 	buffered int             // Amount buffered
+	doneC    chan bool       // Done channel
 }
 
 // Read from the buffer
@@ -40,6 +41,11 @@ func (h *HTTP) Read(b []byte) (int, error) {
 	}
 	// Read from the buffer
 	return h.buffer.Read(b)
+}
+
+// Done channel
+func (h *HTTP) Done() <-chan bool {
+	return (<-chan bool)(h.doneC)
 }
 
 // Closes and removes the temporary buffer file
@@ -63,6 +69,7 @@ func (h *HTTP) Buffer() error {
 	logger.WithFields(f).Debug("start http buffer")
 	defer logger.WithFields(f).Debug("finished buffering")
 	defer h.Response.Body.Close() // Close the HTTP Response body once we are done
+	defer func(h *HTTP) { h.doneC <- true }(h)
 	// Make the buffer
 	file, buff, err := Make(h.Response.ContentLength)
 	if err != nil {
@@ -79,7 +86,6 @@ func (h *HTTP) Buffer() error {
 		if err != nil {
 			switch err {
 			case io.EOF:
-				logger.WithError(err).Error("http response EOF")
 				eof = true
 			default:
 				logger.WithError(err).Error("http response body read error")
@@ -103,5 +109,6 @@ func (h *HTTP) Buffer() error {
 func HTTPBuffer(rsp *http.Response) *HTTP {
 	return &HTTP{
 		Response: rsp,
+		doneC:    make(chan bool, 1),
 	}
 }

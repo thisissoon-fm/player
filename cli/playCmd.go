@@ -9,12 +9,14 @@ import (
 	"player/run"
 	"player/sockets/unix"
 
+	"github.com/rs/xid"
 	"github.com/spf13/cobra"
 )
 
 var (
-	playCmdProvider string
-	playCmdTrackID  string
+	playCmdProviderName    string
+	playCmdProviderTrackID string
+	playCmdPlaylistID      string
 )
 
 var playCmd = &cobra.Command{
@@ -28,14 +30,19 @@ var playCmd = &cobra.Command{
 			return
 		}
 		defer client.Close()
-		if playCmdProvider == "" || playCmdTrackID == "" {
+		if playCmdProviderName == "" || playCmdProviderTrackID == "" {
 			fmt.Println("Need a provider and a track ID")
 			return
 		}
+		if playCmdPlaylistID == "" {
+			playCmdPlaylistID = xid.New().String()
+		}
 		payload, err := json.Marshal(&event.PlayPayload{
-			ProviderID: playCmdProvider,
-			TrackID:    playCmdTrackID,
+			PlaylistID:      playCmdPlaylistID,
+			ProviderName:    playCmdProviderName,
+			ProviderTrackID: playCmdProviderTrackID,
 		})
+		fmt.Println("Playlist ID:", playCmdPlaylistID)
 		if err != nil {
 			fmt.Println("Unable to create play payload:", err)
 			return
@@ -94,15 +101,21 @@ var playCmd = &cobra.Command{
 
 func init() {
 	playCmd.PersistentFlags().StringVarP(
-		&playCmdProvider,
-		"provider",
-		"p",
+		&playCmdProviderName,
+		"providerName",
+		"n",
 		"",
-		"Track Provider (google, soundcloud etc)")
+		"Track Provider Name (googlemusic, soundcloud etc)")
 	playCmd.PersistentFlags().StringVarP(
-		&playCmdTrackID,
-		"track",
+		&playCmdProviderTrackID,
+		"providerTrackID",
 		"t",
 		"",
-		"Track ID")
+		"Provider Track ID")
+	playCmd.PersistentFlags().StringVarP(
+		&playCmdPlaylistID,
+		"playlistID",
+		"i",
+		"",
+		"SOON_ Playlist ID")
 }

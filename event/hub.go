@@ -326,7 +326,12 @@ func (hub *Hub) playTrack(ce ClientEvent) error {
 	if err := json.Unmarshal(ce.Event.Payload, payload); err != nil {
 		return err
 	}
-	if err := player.Play(payload.ProviderID, payload.TrackID); err != nil {
+	err := player.Play(player.LoadTrackConfig{
+		ProviderName:    payload.ProviderName,
+		ProviderTrackID: payload.ProviderTrackID,
+		PlaylistID:      payload.PlaylistID,
+	})
+	if err != nil {
 		payload, err := json.Marshal(&ErrorPayload{
 			Error: err.Error(),
 		})

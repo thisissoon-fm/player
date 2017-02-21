@@ -18,6 +18,7 @@ type Spotify struct {
 	session  *spotify.Session // Spotify Session
 	bufferC  chan bool
 	closeC   chan bool
+	doneC    chan bool // Done channel
 }
 
 // Read from the buffer
@@ -37,6 +38,11 @@ func (s *Spotify) Read(b []byte) (int, error) {
 	}
 	// Read from the buffer
 	return s.buffer.Read(b)
+}
+
+// Done channel
+func (s *Spotify) Done() <-chan bool {
+	return (<-chan bool)(s.doneC)
 }
 
 func (s *Spotify) Close() error {
@@ -93,6 +99,7 @@ func (s *Spotify) Buffer(track *spotify.Track) error {
 	select {
 	case <-s.session.EndOfTrackUpdates():
 		logger.Debug("end of track updates")
+		s.doneC <- true
 		s.bufferC <- true
 		return nil
 	case <-s.closeC:
@@ -105,6 +112,7 @@ func SpotifyBuffer(session *spotify.Session) *Spotify {
 	return &Spotify{
 		session: session,
 		bufferC: make(chan bool, 1),
+		doneC:   make(chan bool, 1),
 		closeC:  make(chan bool),
 	}
 }

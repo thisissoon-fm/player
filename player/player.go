@@ -62,23 +62,34 @@ func DelProvider(p string) {
 	player.Providers.Del(p)
 }
 
+// Configuration to pass to player play method
+type LoadTrackConfig struct {
+	ProviderName    string
+	ProviderTrackID string
+	PlaylistID      string
+}
+
 // Audio Player
 type Player struct {
-	// Exported Fields
 	Providers Providers // Service Providers (google etc)
-	// Unexported Fields
-	pauseLock *sync.Mutex
-	playing   bool
+	// Tracks
+	tracksLock *sync.Mutex
+	Tracks     Tracks // Tracks loaded into the player
+	// Pausing
 	paused    bool
-	// Orechestration channels
+	pauseLock *sync.Mutex
+	pauseC    chan bool
+	pausedC   chan bool
+	resumeC   chan bool
+	// Playing
+	playing  bool
+	playingC chan bool
+	// Stopped
 	stopC    chan bool
 	stoppedC chan bool
-	pauseC   chan bool
-	pausedC  chan bool
-	resumeC  chan bool
-	playingC chan bool
-	playWg   *sync.WaitGroup
-	closeC   chan bool
+	// Close orchestration
+	playWg *sync.WaitGroup
+	closeC chan bool
 }
 
 // Close the pulse audio stream
@@ -146,40 +157,61 @@ func (p *Player) IsPlaying() bool {
 	return p.playing
 }
 
-// Play a track from a service
-func Play(provider, id string) error { return player.Play(provider, id) }
-func (p *Player) Play(provider, id string) error {
-	logger.WithFields(logger.F{
-		"provider": provider,
-		"track":    id,
-	}).Info("play track")
+// Load a track into the player
+func LoadTrack(c LoadTrackConfig) (*Track, error) { return player.LoadTrack(c) }
+func (p *Player) LoadTrack(c LoadTrackConfig) (*Track, error) {
+	var track *Track
+	track = p.Tracks.Get(c.PlaylistID)
+	if track == nil {
+		provider := p.Providers.Get(c.ProviderName)
+		if p == nil {
+			return nil, ErrUnknownProvider
+		}
+		track = NewTrack(c.PlaylistID, c.ProviderTrackID, provider)
+		if err := track.Load(); err != nil {
+			return nil, err
+		}
+		// Add track to player loaded tracks
+		p.tracksLock.Lock()
+		p.Tracks.Add(track)
+		p.tracksLock.Unlock()
+	}
+	return track, nil
+}
+
+// Play a track from a provider
+func Play(c LoadTrackConfig) error { return player.Play(c) }
+func (p *Player) Play(c LoadTrackConfig) error {
+	// Are we playing, if we are then we can't play something else ;)
 	if p.playing {
 		return ErrPlaying
 	}
-	// Get the streamer
-	prvdr := p.Providers.Get(provider)
-	if p == nil {
-		return ErrUnknownProvider
-	}
-	// Get track stream
-	stream, err := prvdr.Stream(id)
+	// Load the track
+	track, err := p.LoadTrack(c)
 	if err != nil {
 		return err
 	}
-	go p.play(stream) // Fire play goroutine
+	// Fire play goroutine
+	go p.play(track)
+	// Fire playing signal
 	p.playingC <- true
+	// Remove the track from the track store
+	p.tracksLock.Lock()
+	p.Tracks.Del(c.PlaylistID)
+	p.tracksLock.Unlock()
 	return nil
 }
 
+// Send playing signal
 func Playing() <-chan bool { return player.Playing() }
 func (p *Player) Playing() <-chan bool {
 	return (<-chan bool)(p.playingC)
 }
 
 // Plays a track, handling pause / resume / stop events
-func (p *Player) play(stream io.ReadCloser) error {
-	logger.Debug("start playback")
-	defer logger.Debug("exit playback")
+func (p *Player) play(track io.ReadCloser) error {
+	logger.Debug("start track playback")
+	defer logger.Debug("exit track playback")
 	// Close orchestration
 	p.playWg.Add(1)
 	defer p.playWg.Done()
@@ -189,28 +221,28 @@ func (p *Player) play(stream io.ReadCloser) error {
 	p.playing = true
 	defer func(p *Player) { p.playing = false }(p) // Reset player playing statr
 	defer func(p *Player) { p.paused = false }(p)  // Reset player pause state
-	defer stream.Close()                           // Close the stream reader
+	defer track.Close()                            // Close the track
 	// Get audio output
 	output, err := audio.Get()
 	if err != nil {
 		return err
 	}
 	// Load cassette
-	cassette := audio.NewCassette(stream, output)
-	go cassette.Play() // Start playing the cassette
-	defer cassette.Eject()
+	input := audio.NewInput(track, output)
+	go input.Play() // Start playing the input
+	defer input.Close()
 	for {
 		select {
-		case <-cassette.End():
+		case <-input.End():
 			return nil
 		case <-p.pauseC:
 			p.paused = true
 			p.pausedC <- true
-			cassette.Stop()
+			input.Stop()
 		case <-p.resumeC:
 			p.paused = false
 			p.playingC <- true
-			cassette.Resume()
+			input.Resume()
 		case <-p.stopC:
 			return nil
 		case <-p.closeC:
@@ -224,17 +256,21 @@ func (p *Player) play(stream io.ReadCloser) error {
 // Consturcts a new Player with the given steamers
 func New() *Player {
 	player := &Player{
+		// Providers
 		Providers: make(Providers),
-		pauseLock: &sync.Mutex{},
+		// Tracks
+		tracksLock: &sync.Mutex{},
+		Tracks:     make(Tracks),
 		// Orchestration channels
-		stopC:    make(chan bool, 1),
-		stoppedC: make(chan bool, 1),
-		pauseC:   make(chan bool, 1),
-		pausedC:  make(chan bool, 1),
-		resumeC:  make(chan bool, 1),
-		playingC: make(chan bool, 1),
-		playWg:   &sync.WaitGroup{},
-		closeC:   make(chan bool, 1),
+		pauseLock: &sync.Mutex{},
+		stopC:     make(chan bool, 1),
+		stoppedC:  make(chan bool, 1),
+		pauseC:    make(chan bool, 1),
+		pausedC:   make(chan bool, 1),
+		resumeC:   make(chan bool, 1),
+		playingC:  make(chan bool, 1),
+		playWg:    &sync.WaitGroup{},
+		closeC:    make(chan bool, 1),
 	}
 	return player
 }
