@@ -3,6 +3,7 @@ package buffer
 import (
 	"io"
 	"os"
+	"sync"
 
 	"player/logger"
 
@@ -13,12 +14,11 @@ import (
 // Spotify buffer
 type Spotify struct {
 	file     *os.File         // Buffer temporary file
-	buffer   buffer.BufferAt  // Internal Buffer
+	buffer   buffer.Buffer    // Internal Buffer
 	buffered int              // Amount buffered
 	session  *spotify.Session // Spotify Session
-	bufferC  chan bool
+	wg       sync.WaitGroup
 	closeC   chan bool
-	doneC    chan bool // Done channel
 }
 
 // Read from the buffer
@@ -40,24 +40,11 @@ func (s *Spotify) Read(b []byte) (int, error) {
 	return s.buffer.Read(b)
 }
 
-// Done channel
-func (s *Spotify) Done() <-chan bool {
-	return (<-chan bool)(s.doneC)
-}
-
 func (s *Spotify) Close() error {
+	logger.Debug("close spotify buffer")
+	defer logger.Debug("closed spotify buffer")
 	close(s.closeC)
-	<-s.bufferC // Wait for buffer method to exit
-	if s.file != nil {
-		if err := s.file.Close(); err != nil {
-			logger.WithError(err).Error("error closing buffer file")
-			return err
-		}
-		if err := os.Remove(s.file.Name()); err != nil {
-			logger.WithError(err).Error("error removing buffer file")
-			return err
-		}
-	}
+	s.wg.Wait()
 	return nil
 }
 
@@ -77,15 +64,13 @@ func (s *Spotify) WriteAudio(f spotify.AudioFormat, raw []byte) int {
 }
 
 func (s *Spotify) Buffer(track *spotify.Track) error {
+	s.wg.Add(1)
+	defer s.wg.Done()
 	logger.Debug("start spotify buffer")
 	defer logger.Debug("exit spotify buffer")
-	// Make the buffer
-	file, buff, err := Make(1024 * 1024 * 104) // 100mb
-	if err != nil {
-		return err
-	}
-	s.file = file
-	s.buffer = buff
+	// Buffer to memory for spotify, results in smoother playback
+	buf := buffer.NewPartition(buffer.NewMemPool(128 * 1024))
+	s.buffer = buf
 	// Start playing - writes to buffer instead of autio out
 	player := s.session.Player()
 	if err := player.Prefetch(track); err != nil {
@@ -99,11 +84,8 @@ func (s *Spotify) Buffer(track *spotify.Track) error {
 	select {
 	case <-s.session.EndOfTrackUpdates():
 		logger.Debug("end of track updates")
-		s.doneC <- true
-		s.bufferC <- true
 		return nil
 	case <-s.closeC:
-		s.bufferC <- true
 		return nil
 	}
 }
@@ -111,8 +93,6 @@ func (s *Spotify) Buffer(track *spotify.Track) error {
 func SpotifyBuffer(session *spotify.Session) *Spotify {
 	return &Spotify{
 		session: session,
-		bufferC: make(chan bool, 1),
-		doneC:   make(chan bool, 1),
 		closeC:  make(chan bool),
 	}
 }
