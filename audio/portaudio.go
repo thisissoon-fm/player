@@ -5,7 +5,6 @@
 package audio
 
 import (
-	"fmt"
 	"sync"
 
 	"player/logger"
@@ -122,7 +121,6 @@ func (output *Output) write(out []int16) {
 
 // Push data onto our input channel queue
 func (output *Output) Write(data []int16) (int, error) {
-	fmt.Println(data)
 	output.inputC <- data
 	return len(data), nil
 }

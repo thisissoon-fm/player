@@ -5,7 +5,7 @@
 
 OS 					?= $(shell echo `uname -s` | tr '[:upper:]' '[:lower:]')
 ARCH 				?= $(shell echo `uname -m` | tr '[:upper:]' '[:lower:]')
-AUDIO_SYSTEM 		?= pulseaudio
+AUDIO_SYSTEM 		?= portaudio
 CGO_ENABLED 		?= 1
 CGO_CFLAGS 			?= ""
 CGO_LDFLAGS 		?= ""
@@ -43,4 +43,5 @@ arm7l:
 		-v `pwd`:/go/src/player \
 		-e GOARM=7 \
 		-e BUILD_TIME=$(BUILD_TIME) \
+		-e AUDIO_SYSTEM=$(AUDIO_SYSTEM) \
 		registry.soon.build/sfm/player:rpxc

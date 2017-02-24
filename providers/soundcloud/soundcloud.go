@@ -28,9 +28,6 @@ func (scs *SoundCloudStream) Close() error {
 type SoundCloud struct {
 	// Exported Fields
 	Config Configurer
-	// Unexported Fields
-	pw *io.PipeWriter
-	pr *io.PipeReader
 }
 
 // constructs a steam url for the given track
