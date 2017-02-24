@@ -1,5 +1,9 @@
 package audio
 
+import "errors"
+
+var ErrNoOutput = errors.New("no output stream setup")
+
 const (
 	CHANNELS          = 2
 	SAMPLE_RATE       = 44100

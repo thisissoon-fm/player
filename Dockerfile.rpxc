@@ -13,7 +13,7 @@ COPY mopidy.apt.sources.list /rpxc/sysroot/etc/apt/sources.list.d/mopidy.sources
 COPY mopidy.gpg /rpxc/sysroot/etc/apt/mopidy.gpg
 RUN rpdo apt-key add /etc/apt/mopidy.gpg
 
-RUN install-raspbian --update portaudio19-dev libspotify-dev
+RUN install-raspbian --update portaudio19-dev libpulse-dev libspotify-dev
 
 RUN install-debian pkg-config
 

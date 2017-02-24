@@ -1,18 +1,17 @@
 // Port Audio Streaming
 
+// +build portaudio
+
 package audio
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 
 	"player/logger"
 
 	"github.com/gordonklaus/portaudio"
 )
-
-// No output setup error
-var ErrNoOutput = errors.New("no output stream setup")
 
 // Audio output stream handler
 var output *Output
@@ -123,6 +122,7 @@ func (output *Output) write(out []int16) {
 
 // Push data onto our input channel queue
 func (output *Output) Write(data []int16) (int, error) {
+	fmt.Println(data)
 	output.inputC <- data
 	return len(data), nil
 }
