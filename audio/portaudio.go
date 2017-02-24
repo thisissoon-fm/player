@@ -27,6 +27,7 @@ func Open() error {
 	if err != nil {
 		return err
 	}
+	// Select device
 	device := host.DefaultOutputDevice
 	logger.WithFields(logger.F{
 		"name":       device.Name,
