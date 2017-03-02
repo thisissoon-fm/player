@@ -7,20 +7,23 @@ import (
 )
 
 const (
-	vHost  = "websocket.host"
-	vRetry = "websocket.retru"
+	vHost     = "websocket.host"
+	vRetry    = "websocket.retry"
+	vUsername = "websocket.username"
+	vPassword = "websocket.password"
 )
 
 func init() {
-	viper.BindEnv(vHost)
 	viper.SetDefault(vHost, "localhost:8000")
-	viper.BindEnv(vRetry)
 	viper.SetDefault(vRetry, "5s")
+	viper.BindEnv(vHost, vRetry, vUsername, vPassword)
 }
 
 type Configurer interface {
 	Host() string
 	Retry() time.Duration
+	Username() string
+	Password() string
 }
 
 type Config struct{}
@@ -31,6 +34,14 @@ func (c Config) Host() string {
 
 func (c Config) Retry() time.Duration {
 	return viper.GetDuration(vRetry)
+}
+
+func (c Config) Username() string {
+	return viper.GetString(vUsername)
+}
+
+func (c Config) Password() string {
+	return viper.GetString(vPassword)
 }
 
 func NewConfig() Config {

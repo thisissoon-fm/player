@@ -15,9 +15,12 @@
 package web
 
 import (
+	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -74,7 +77,21 @@ func (c *Client) url() string {
 
 // Returns headers tp use for connecting to the server
 func (c *Client) headers() http.Header {
-	return http.Header{}
+	headers := http.Header{}
+	// Authorization header
+	plain := fmt.Sprintf("%s:%s", c.Config.Username(), c.Config.Password())
+	encoded := base64.StdEncoding.EncodeToString([]byte(plain))
+	headers.Add("Authorization", fmt.Sprintf("Basic %s", encoded))
+	// Topics we want to subscribe too
+	// TODO: live in config?
+	topics := []string{
+		"player:play",
+		"player:stop",
+		"player:pause",
+		"player:resume",
+	}
+	headers.Add("Topics", strings.Join(topics, ","))
+	return headers
 }
 
 // Connect to server
