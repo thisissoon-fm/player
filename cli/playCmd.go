@@ -48,7 +48,7 @@ var playCmd = &cobra.Command{
 			return
 		}
 		body, err := json.Marshal(&event.Event{
-			Type:    event.PlayEvent,
+			Topic:   event.PlayEvent,
 			Created: time.Now().UTC(),
 			Payload: json.RawMessage(payload),
 		})
@@ -72,7 +72,7 @@ var playCmd = &cobra.Command{
 				if err := json.Unmarshal(b, e); err != nil {
 					fmt.Println("error reading event:", err)
 				}
-				switch e.Type {
+				switch e.Topic {
 				case event.PlayingEvent:
 					fmt.Println("Playing track")
 					return

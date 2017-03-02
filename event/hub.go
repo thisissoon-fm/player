@@ -161,7 +161,7 @@ func (hub *Hub) Broadcast(event Event) error {
 func PlayerReady() error { return hub.PlayerReady() }
 func (h *Hub) PlayerReady() error {
 	event := Event{
-		Type:    PlayerReadyEvent,
+		Topic:   PlayerReadyEvent,
 		Created: time.Now().UTC(),
 	}
 	if err := hub.Broadcast(event); err != nil {
@@ -174,7 +174,7 @@ func (h *Hub) PlayerReady() error {
 func Offline() error { return hub.Offline() }
 func (h *Hub) Offline() error {
 	event := Event{
-		Type:    PlayerOfflineEvent,
+		Topic:   PlayerOfflineEvent,
 		Created: time.Now().UTC(),
 	}
 	if err := hub.Broadcast(event); err != nil {
@@ -236,7 +236,7 @@ func (hub *Hub) read(client Client) error {
 // so errors can be surfaced back to the clients
 func (hub *Hub) handleEvent(ce ClientEvent) error {
 	logger.Debug("handle event")
-	switch ce.Event.Type {
+	switch ce.Event.Topic {
 	case PauseEvent:
 		return hub.pausePlayer(ce)
 	case ResumeEvent:
@@ -268,7 +268,7 @@ func (hub *Hub) pausePlayer(ce ClientEvent) error {
 		hub.eventsC <- ClientEvent{
 			Client: ce.Client,
 			Event: Event{
-				Type:    ErrorEvent,
+				Topic:   ErrorEvent,
 				Created: time.Now().UTC(),
 				Payload: json.RawMessage(payload),
 			},
@@ -281,7 +281,7 @@ func (hub *Hub) pausePlayer(ce ClientEvent) error {
 func (hub *Hub) pausedPlayer() error {
 	logger.Debug("handle paused event")
 	event := Event{
-		Type:    PausedEvent,
+		Topic:   PausedEvent,
 		Created: time.Now().UTC(),
 	}
 	if err := hub.Broadcast(event); err != nil {
@@ -307,7 +307,7 @@ func (hub *Hub) resumePlayer(ce ClientEvent) error {
 		hub.eventsC <- ClientEvent{
 			Client: ce.Client,
 			Event: Event{
-				Type:    ErrorEvent,
+				Topic:   ErrorEvent,
 				Created: time.Now().UTC(),
 				Payload: json.RawMessage(payload),
 			},
@@ -339,7 +339,7 @@ func (hub *Hub) playTrack(ce ClientEvent) error {
 			return err
 		}
 		body, err := json.Marshal(&Event{
-			Type:    ErrorEvent,
+			Topic:   ErrorEvent,
 			Created: time.Now().UTC(),
 			Payload: json.RawMessage(payload),
 		})
@@ -357,7 +357,7 @@ func (hub *Hub) playTrack(ce ClientEvent) error {
 func (hub *Hub) playingTrack() error {
 	logger.Debug("handle playing event")
 	event := Event{
-		Type:    PlayingEvent,
+		Topic:   PlayingEvent,
 		Created: time.Now().UTC(),
 	}
 	if err := hub.Broadcast(event); err != nil {
@@ -381,7 +381,7 @@ func (hub *Hub) stopTrack(ce ClientEvent) error {
 		hub.eventsC <- ClientEvent{
 			Client: ce.Client,
 			Event: Event{
-				Type:    ErrorEvent,
+				Topic:   ErrorEvent,
 				Created: time.Now().UTC(),
 				Payload: json.RawMessage(payload),
 			},
@@ -394,7 +394,7 @@ func (hub *Hub) stopTrack(ce ClientEvent) error {
 func (hub *Hub) stoppedPlayer() error {
 	logger.Debug("handle player stopped event")
 	event := Event{
-		Type:    StoppedEvent,
+		Topic:   StoppedEvent,
 		Created: time.Now().UTC(),
 	}
 	if err := hub.Broadcast(event); err != nil {

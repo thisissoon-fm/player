@@ -25,7 +25,7 @@ var resumeCmd = &cobra.Command{
 		}
 		defer client.Close()
 		eb, err := json.Marshal(&event.Event{
-			Type:    event.ResumeEvent,
+			Topic:   event.ResumeEvent,
 			Created: time.Now().UTC(),
 		})
 		if err != nil {
@@ -49,7 +49,7 @@ var resumeCmd = &cobra.Command{
 				if err := json.Unmarshal(b, e); err != nil {
 					fmt.Println("error reading event:", err)
 				}
-				switch e.Type {
+				switch e.Topic {
 				case event.PlayingEvent:
 					fmt.Println("Playback resumed")
 					return

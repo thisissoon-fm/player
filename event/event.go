@@ -38,7 +38,7 @@ type ReadWriteCloser interface {
 }
 
 type Event struct {
-	Type    string          `json:"type"`
+	Topic   string          `json:"topic"`
 	Created time.Time       `json:"created"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 }

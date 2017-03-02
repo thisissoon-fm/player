@@ -25,7 +25,7 @@ var stopCmd = &cobra.Command{
 		}
 		defer client.Close()
 		eb, err := json.Marshal(&event.Event{
-			Type:    event.StopEvent,
+			Topic:   event.StopEvent,
 			Created: time.Now().UTC(),
 		})
 		if err != nil {
@@ -49,7 +49,7 @@ var stopCmd = &cobra.Command{
 				if err := json.Unmarshal(b, e); err != nil {
 					fmt.Println("error reading event:", err)
 				}
-				switch e.Type {
+				switch e.Topic {
 				case event.StoppedEvent:
 					fmt.Println("Playback stopped")
 					return
