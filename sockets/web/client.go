@@ -95,15 +95,37 @@ func (c *Client) headers() http.Header {
 }
 
 // Connect to server
-func (c *Client) connect() error {
-	logger.WithField("url", c.url()).Debug("connecting to websocket server")
-	conn, _, err := dialer.Dial(c.url(), c.headers())
-	if err != nil {
-		return err
+func (c *Client) connect() {
+	logger.Debug("start websocket connect lopp")
+	defer logger.Debug("exit websocket connect loop")
+	for {
+		select {
+		case <-c.closeC:
+			return
+		case <-c.connectC:
+			break
+		case <-time.After(c.Config.Retry()):
+			break
+		}
+		logger.WithField("url", c.url()).Debug("connecting to websocket server")
+		conn, _, err := dialer.Dial(c.url(), c.headers())
+		if err != nil {
+			logger.WithError(err).Error("failed to connect to websocket server")
+			continue
+		}
+		conn.SetPingHandler(c.ping)
+		c.connected = true
+		c.conn = conn
+		event.Add(c) // Add to event hub
+		go c.read()  // Start a read routine
+		break
 	}
-	c.connected = true
-	c.conn = conn
-	return nil
+}
+
+// Ping handler, pongs back
+func (c *Client) ping(string) error {
+	logger.Debug("ping from websocket server")
+	return c.conn.WriteMessage(websocket.PongMessage, []byte{})
 }
 
 // Reads messages from the websocket connection
@@ -124,11 +146,21 @@ func (c *Client) read() {
 				// Don't connect if closing
 				return
 			default:
-				go c.Connect() // Start the connection routine
+				go func() {
+					c.wg.Add(1)
+					c.connect()
+					c.wg.Done()
+				}()
 				return
 			}
 		}
-		c.messageC <- message{typ, msg, err} // Place message on channel
+		logger.WithFields(logger.F{
+			"type":    typ,
+			"message": string(msg),
+		}).Debug("received websocket message")
+		if typ == websocket.TextMessage {
+			c.messageC <- message{typ, msg, err} // Place message on channel
+		}
 	}
 }
 
@@ -139,31 +171,12 @@ func (c *Client) ID() string {
 
 // Connect to the websocket server
 func (c *Client) Connect() {
-	c.wg.Add(1)
-	defer c.wg.Done()
-	logger.Debug("start websocket connect loop")
-	defer logger.Debug("exit websocket service connect loop")
 	c.connectC <- true // connect immediately
-	for {
-		select {
-		case <-c.closeC:
-			return
-		case <-c.connectC:
-			break
-		case <-time.After(c.Config.Retry()):
-			break
-		}
-		if err := c.connect(); err != nil {
-			logger.WithError(err).WithFields(logger.F{
-				"retry": c.Config.Retry(),
-				"url":   c.url(),
-			}).Error("failed connecting to websocket server")
-			continue
-		}
-		event.Add(c) // Add to event hub
-		go c.read()  // Start a read routine
-		return
-	}
+	go func() {
+		c.wg.Add(1)
+		c.connect()
+		c.wg.Done()
+	}()
 }
 
 // Connected state
