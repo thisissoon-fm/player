@@ -34,5 +34,5 @@ func TimeStr() string {
 	if err != nil {
 		return "n/a"
 	}
-	return t.Format("Monday Janurary 2 at 15:04:05 MST")
+	return t.Format("Monday January 2 2006 at 15:04:05 MST")
 }

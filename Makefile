@@ -16,8 +16,8 @@ GOOUTDIR 			?= .
 GOOUT  				?= "$(GOOUTDIR)/sfmplayer.$(OS)-$(ARCH)-$(AUDIO_SYSTEM)"
 BUILD_TIME 			?= $(shell date +%s)
 BUILD_VERSION 		?= $(shell git rev-parse --short HEAD)
-BUILD_TIME_FLAG 	?= -X player/build.timestamp=${BUILD_TIME}
-BUILD_VERSION_FLAG 	?= -X player/build.version=${BUILD_VERSION}
+BUILD_TIME_FLAG 	?= -X player/build.timestamp=$(BUILD_TIME)
+BUILD_VERSION_FLAG 	?= -X player/build.version=$(BUILD_VERSION)
 BUILD_ARCH_FLAG 	?= -X player/build.arch=$(if $(call check_defined, GOARCH),$(GOARM),$(ARCH))
 BUILD_OS_FLAG 		?= -X player/build.os=$(if $(call check_defined, GOOS),$(GOOS),$(OS))
 
