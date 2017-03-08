@@ -47,6 +47,7 @@ type PlayPayload struct {
 	ProviderName    string `json:"providerID"`      // The provider name (googlemusic, soundcloud)
 	ProviderTrackID string `json:"providerTrackID"` // The provider track id from the provider
 	PlaylistID      string `json:"playlistID"`      // The Playlist ID from the playlist service
+	UserID          string `json:"userID"`          // The user who queued the track
 }
 
 type ErrorPayload struct {

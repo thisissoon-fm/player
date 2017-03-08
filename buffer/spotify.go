@@ -29,7 +29,7 @@ func (s *Spotify) Read(b []byte) (int, error) {
 		return 0, io.ErrShortBuffer
 	}
 	// Wait for buffer to fill
-	if s.buffered < 16*1024 {
+	if s.buffered < 32*1024 {
 		return 0, io.ErrShortBuffer
 	}
 	// If we are at the end of the buffer return EOF
